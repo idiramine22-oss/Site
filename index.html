@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>AR Trace Pro</title>
+
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  background:#000;
+  overflow:hidden;
+  font-family:-apple-system,system-ui;
+  touch-action:none;
+}
+
+video{
+  position:fixed;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+#overlay{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform-origin:center;
+}
+
+#overlay img{
+  width:300px;
+  display:block;
+  pointer-events:none;
+}
+
+.panel{
+  position:fixed;
+  bottom:10px;
+  left:10px;
+  right:10px;
+  background:rgba(20,20,25,.7);
+  backdrop-filter:blur(10px);
+  border-radius:16px;
+  padding:10px;
+}
+
+button,label{
+  background:#222;
+  color:#fff;
+  border:none;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:13px;
+}
+
+label input{display:none;}
+
+.top{
+  position:fixed;
+  top:10px;
+  left:10px;
+  right:10px;
+  display:flex;
+  justify-content:space-between;
+  color:#fff;
+}
+
+</style>
+</head>
+
+<body>
+
+<video id="cam" autoplay playsinline muted></video>
+
+<div id="overlay">
+  <img id="img">
+</div>
+
+<div class="top">
+  <div>AR Trace</div>
+  <div id="status">Ready</div>
+</div>
+
+<div class="panel">
+  <label>
+    Load Image
+    <input type="file" id="file">
+  </label>
+
+  <button id="reset">Reset</button>
+  <button id="flip">Flip</button>
+  <button id="rot">Rotate</button>
+  <button id="camBtn">Switch Cam</button>
+</div>
+
+<script>
+const cam = document.getElementById("cam");
+const img = document.getElementById("img");
+const overlay = document.getElementById("overlay");
+const status = document.getElementById("status");
+
+let stream;
+let facing="environment";
+
+let state={
+  x:window.innerWidth/2,
+  y:window.innerHeight/2,
+  scale:1,
+  rot:0,
+  flip:1
+};
+
+function apply(){
+  overlay.style.transform =
+    `translate(-50%,-50%) translate(${state.x}px,${state.y}px)
+     scale(${state.scale}) rotate(${state.rot}deg) scaleX(${state.flip})`;
+}
+
+async function startCam(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+
+  stream = await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:facing}
+  });
+
+  cam.srcObject=stream;
+}
+
+document.getElementById("camBtn").onclick=()=>{
+  facing = facing==="environment"?"user":"environment";
+  startCam();
+};
+
+startCam();
+
+document.getElementById("file").onchange=e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+  img.src=URL.createObjectURL(f);
+  status.textContent="Image loaded";
+};
+
+document.getElementById("reset").onclick=()=>{
+  state.scale=1;
+  state.rot=0;
+  state.flip=1;
+  apply();
+};
+
+document.getElementById("flip").onclick=()=>{
+  state.flip*=-1;
+  apply();
+};
+
+document.getElementById("rot").onclick=()=>{
+  state.rot+=90;
+  apply();
+};
+
+let pointers=new Map();
+let start=null;
+
+overlay.addEventListener("pointerdown",e=>{
+  overlay.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+});
+
+overlay.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId)) return;
+
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  const pts=[...pointers.values()];
+
+  if(pts.length===1){
+    if(!start){
+      start={x:pts[0].x,y:pts[0].y,ox:state.x,oy:state.y};
+    }
+    state.x = start.ox + (pts[0].x-start.x);
+    state.y = start.oy + (pts[0].y-start.y);
+  }
+
+  if(pts.length===2){
+    const [a,b]=pts;
+
+    const dx=b.x-a.x;
+    const dy=b.y-a.y;
+
+    const dist=Math.hypot(dx,dy);
+    const angle=Math.atan2(dy,dx);
+
+    if(!start){
+      start={
+        dist,
+        angle,
+        scale:state.scale,
+        rot:state.rot
+      };
+    }
+
+    state.scale = start.scale * (dist/start.dist);
+    state.rot = start.rot + (angle-start.angle)*180/Math.PI;
+  }
+
+  apply();
+});
+
+overlay.addEventListener("pointerup",e=>{
+  pointers.delete(e.pointerId);
+  start=null;
+});
+
+overlay.addEventListener("pointercancel",e=>{
+  pointers.delete(e.pointerId);
+  start=null;
+});
+
+apply();
+</script>
+
+</body>
+</html>
