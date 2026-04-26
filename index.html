@@ -1,70 +1,546 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR Trace Drawing</title>
-<style>
-  body { margin:0; background:black; overflow:hidden; }
-  video, img {
-    position:absolute;
-    top:0; left:0;
-    width:100vw; height:100vh;
-    object-fit:cover;
-  }
-  #overlay {
-    opacity:0.5;
-    pointer-events:none;
-  }
-  .controls {
-    position:fixed;
-    bottom:10px;
-    left:10px;
-    right:10px;
-    background:rgba(0,0,0,0.6);
-    padding:10px;
-    border-radius:10px;
-    color:white;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AR Trace</title>
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --panel: rgba(18, 24, 32, 0.78);
+      --panel2: rgba(255,255,255,0.08);
+      --text: #ffffff;
+      --muted: rgba(255,255,255,0.72);
+      --accent: #8bd3ff;
+      --border: rgba(255,255,255,0.12);
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #camera {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    #overlayWrap {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+      touch-action: none;
+      pointer-events: auto;
+      opacity: 0.55;
+    }
+
+    #overlayImg {
+      display: block;
+      max-width: none;
+      max-height: none;
+      width: 320px;
+      height: auto;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      user-drag: none;
+      user-select: none;
+      filter: none;
+    }
+
+    #hud {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .chip {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      color: var(--text);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .chip b {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    #bottomPanel {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 20;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      color: var(--text);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn, .fileBtn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn:active, .fileBtn:active {
+      transform: scale(0.98);
+    }
+
+    .fileBtn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .fileBtn input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .sliderWrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .label {
+      min-width: 78px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      background: radial-gradient(circle at center, rgba(35,45,60,.95), rgba(0,0,0,.97));
+    }
+
+    #loaderBox {
+      text-align: center;
+      max-width: 320px;
+      padding: 24px;
+    }
+
+    #loaderBox h1 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+
+    #loaderBox p {
+      margin: 0;
+      color: rgba(255,255,255,.75);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    #errorMsg {
+      margin-top: 14px;
+      color: #ffb4b4;
+      font-size: 13px;
+    }
+  </style>
 </head>
 <body>
+  <div id="loader">
+    <div id="loaderBox">
+      <h1>AR Trace</h1>
+      <p>شغل الكاميرا، ارفع الصورة، ثم حرّكها بإصبعك وكبّرها بإصبعين.</p>
+      <div id="errorMsg"></div>
+    </div>
+  </div>
 
-<video id="camera" autoplay playsinline></video>
-<img id="overlay" src="">
+  <div id="stage">
+    <video id="camera" autoplay playsinline muted></video>
+    <div id="overlayWrap">
+      <img id="overlayImg" alt="overlay" />
+    </div>
+  </div>
 
-<div class="controls">
-  <input type="file" accept="image/*" onchange="loadImage(event)">
-  <br>
-  شفافية:
-  <input type="range" min="0" max="1" step="0.01" value="0.5"
-         oninput="changeOpacity(this.value)">
-</div>
+  <div id="hud">
+    <div class="chip">
+      <b>Trace</b>
+      <span class="small">Camera overlay</span>
+    </div>
+    <div class="chip">
+      <span id="statusText" class="small">جاهز</span>
+    </div>
+  </div>
+
+  <div id="bottomPanel">
+    <div class="row">
+      <label class="fileBtn">
+        اختر صورة
+        <input id="fileInput" type="file" accept="image/*" />
+      </label>
+      <button class="btn" id="resetBtn">إعادة ضبط</button>
+      <button class="btn" id="fitBtn">ملاءمة</button>
+    </div>
+
+    <div class="sliderWrap">
+      <div class="label">الشفافية</div>
+      <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.55" />
+    </div>
+
+    <div class="sliderWrap">
+      <div class="label">الحجم</div>
+      <input id="sizeRange" type="range" min="120" max="900" step="1" value="320" />
+    </div>
+
+    <div class="hint">
+      اسحب الصورة بإصبع واحد. كبّر أو صغّر بإصبعين. ثبت الجوال على حامل لنتيجة أدق.
+    </div>
+  </div>
 
 <script>
-const video = document.getElementById('camera');
+(() => {
+  const camera = document.getElementById('camera');
+  const overlayWrap = document.getElementById('overlayWrap');
+  const overlayImg = document.getElementById('overlayImg');
+  const fileInput = document.getElementById('fileInput');
+  const opacityRange = document.getElementById('opacityRange');
+  const sizeRange = document.getElementById('sizeRange');
+  const resetBtn = document.getElementById('resetBtn');
+  const fitBtn = document.getElementById('fitBtn');
+  const statusText = document.getElementById('statusText');
+  const loader = document.getElementById('loader');
+  const errorMsg = document.getElementById('errorMsg');
 
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" },
-  audio: false
-})
-.then(stream => {
-  video.srcObject = stream;
-})
-.catch(err => {
-  alert("ما قدرنا نشغل الكاميرا: " + err);
-});
+  let stream = null;
 
-function loadImage(event){
-  const file = event.target.files[0];
-  const url = URL.createObjectURL(file);
-  document.getElementById('overlay').src = url;
-}
+  let state = {
+    x: 0,
+    y: 0,
+    scale: 1,
+    baseW: 320,
+    baseH: 320,
+    opacity: 0.55
+  };
 
-function changeOpacity(val){
-  document.getElementById('overlay').style.opacity = val;
-}
+  const pointers = new Map();
+  let dragStart = null;
+  let pinchStart = null;
+
+  function setStatus(text) {
+    statusText.textContent = text;
+  }
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function applyTransform() {
+    overlayWrap.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+    overlayWrap.style.opacity = String(state.opacity);
+    overlayImg.style.width = `${state.baseW}px`;
+  }
+
+  function centerOverlay() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    state.x = (vw - state.baseW) / 2;
+    state.y = (vh - state.baseH) / 2;
+    applyTransform();
+  }
+
+  function fitOverlayToScreen() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const target = Math.min(vw * 0.72, vh * 0.72);
+    state.baseW = target;
+    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+      state.baseH = target * ratio;
+    } else {
+      state.baseH = target;
+    }
+    sizeRange.value = String(Math.round(state.baseW));
+    state.scale = 1;
+    centerOverlay();
+    applyTransform();
+  }
+
+  async function startCamera() {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('المتصفح لا يدعم الكاميرا');
+      }
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+
+      camera.srcObject = stream;
+      await camera.play();
+
+      loader.style.display = 'none';
+      setStatus('الكاميرا شغالة');
+    } catch (err) {
+      loader.style.display = 'flex';
+      errorMsg.textContent = 'ما قدرت أشغل الكاميرا. تأكد أنك فتحت الموقع عبر HTTPS وأنك سمحت بالكاميرا.';
+      console.error(err);
+    }
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    overlayImg.onload = () => {
+      if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+        const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+        state.baseW = Math.min(window.innerWidth * 0.72, 420);
+        state.baseH = state.baseW * ratio;
+        sizeRange.value = String(Math.round(state.baseW));
+        state.scale = 1;
+        centerOverlay();
+        applyTransform();
+        setStatus('تم تحميل الصورة');
+      }
+    };
+    overlayImg.src = url;
+  });
+
+  opacityRange.addEventListener('input', (e) => {
+    state.opacity = parseFloat(e.target.value);
+    applyTransform();
+  });
+
+  sizeRange.addEventListener('input', (e) => {
+    state.baseW = parseInt(e.target.value, 10);
+    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+      state.baseH = state.baseW * ratio;
+    } else {
+      state.baseH = state.baseW;
+    }
+    applyTransform();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    state.scale = 1;
+    sizeRange.value = String(Math.round(state.baseW));
+    centerOverlay();
+    applyTransform();
+    setStatus('تمت الإعادة');
+  });
+
+  fitBtn.addEventListener('click', () => {
+    if (!overlayImg.src) return;
+    fitOverlayToScreen();
+    setStatus('تمت الملاءمة');
+  });
+
+  function getDistance(t1, t2) {
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function getCenter(t1, t2) {
+    return {
+      x: (t1.clientX + t2.clientX) / 2,
+      y: (t1.clientY + t2.clientY) / 2
+    };
+  }
+
+  overlayWrap.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    overlayWrap.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+      dragStart = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: state.x,
+        originY: state.y
+      };
+      setStatus('سحب');
+    }
+
+    if (pointers.size === 2) {
+      const pts = Array.from(pointers.values());
+      const ids = Array.from(pointers.keys());
+      pinchStart = {
+        id1: ids[0],
+        id2: ids[1],
+        startDist: getDistance(pts[0], pts[1]),
+        startScale: state.scale,
+        startX: state.x,
+        startY: state.y,
+        center: getCenter(pts[0], pts[1])
+      };
+      dragStart = null;
+      setStatus('تكبير/تصغير');
+    }
+  });
+
+  overlayWrap.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    e.preventDefault();
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1 && dragStart) {
+      const dx = e.clientX - dragStart.startX;
+      const dy = e.clientY - dragStart.startY;
+      state.x = dragStart.originX + dx;
+      state.y = dragStart.originY + dy;
+      applyTransform();
+    }
+
+    if (pointers.size === 2 && pinchStart) {
+      const pts = Array.from(pointers.values());
+      const ids = Array.from(pointers.keys());
+      const p1 = pts[0];
+      const p2 = pts[1];
+      const dist = getDistance(p1, p2);
+      const rawScale = pinchStart.startScale * (dist / pinchStart.startDist);
+      state.scale = clamp(rawScale, 0.2, 6);
+
+      const currentCenter = getCenter(p1, p2);
+      const shiftX = currentCenter.x - pinchStart.center.x;
+      const shiftY = currentCenter.y - pinchStart.center.y;
+
+      state.x = pinchStart.startX + shiftX;
+      state.y = pinchStart.startY + shiftY;
+
+      applyTransform();
+    }
+  });
+
+  function endPointer(e) {
+    if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
+
+    if (pointers.size === 0) {
+      dragStart = null;
+      pinchStart = null;
+      setStatus('جاهز');
+    } else if (pointers.size === 1) {
+      const remaining = Array.from(pointers.entries())[0];
+      dragStart = {
+        pointerId: remaining[0],
+        startX: remaining[1].x,
+        startY: remaining[1].y,
+        originX: state.x,
+        originY: state.y
+      };
+      pinchStart = null;
+      setStatus('سحب');
+    }
+  }
+
+  overlayWrap.addEventListener('pointerup', endPointer);
+  overlayWrap.addEventListener('pointercancel', endPointer);
+  overlayWrap.addEventListener('pointerleave', endPointer);
+
+  window.addEventListener('resize', () => {
+    if (!overlayImg.src) return;
+    centerOverlay();
+  });
+
+  overlayImg.addEventListener('load', () => {
+    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+      state.baseW = Math.min(window.innerWidth * 0.72, 420);
+      state.baseH = state.baseW * ratio;
+      sizeRange.value = String(Math.round(state.baseW));
+      state.scale = 1;
+      centerOverlay();
+      applyTransform();
+    }
+  });
+
+  applyTransform();
+  startCamera();
+})();
 </script>
-
 </body>
 </html>
