@@ -1,354 +1,702 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR Trace</title>
-  <style>
-    :root{
-      --bg: #0b0f14;
-      --panel: rgba(18, 24, 32, 0.78);
-      --panel2: rgba(255,255,255,0.08);
-      --text: #ffffff;
-      --muted: rgba(255,255,255,0.72);
-      --accent: #8bd3ff;
-      --border: rgba(255,255,255,0.12);
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>AR Trace Pro</title>
+<style>
+  :root{
+    --bg:#05070a;
+    --panel:rgba(16,20,28,.78);
+    --panel-2:rgba(255,255,255,.08);
+    --panel-3:rgba(255,255,255,.12);
+    --text:#fff;
+    --muted:rgba(255,255,255,.72);
+    --border:rgba(255,255,255,.12);
+    --accent:#8bd3ff;
+    --danger:#ff8f8f;
+    --ok:#8fffbb;
+  }
 
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
+  html, body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-user-select:none;
+    user-select:none;
+    touch-action:none;
+  }
 
-    #stage {
-      position: fixed;
-      inset: 0;
-      overflow: hidden;
-      background: #000;
-    }
+  #app{
+    position:fixed;
+    inset:0;
+    background:#000;
+  }
 
-    #camera {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      background: #000;
-    }
+  #camera{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    background:#000;
+  }
 
-    #overlayWrap {
-      position: absolute;
-      left: 0;
-      top: 0;
-      transform-origin: 0 0;
-      will-change: transform;
-      touch-action: none;
-      pointer-events: auto;
-      opacity: 0.55;
-    }
+  #overlayWrap{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform-origin:center center;
+    touch-action:none;
+    will-change:transform,left,top,width,height,opacity;
+    opacity:.58;
+  }
 
-    #overlayImg {
-      display: block;
-      max-width: none;
-      max-height: none;
-      width: 320px;
-      height: auto;
-      pointer-events: none;
-      -webkit-user-drag: none;
-      user-drag: none;
-      user-select: none;
-      filter: none;
-    }
+  #overlayImg{
+    display:block;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    -webkit-user-drag:none;
+    user-drag:none;
+    user-select:none;
+  }
 
-    #hud {
-      position: fixed;
-      left: 12px;
-      right: 12px;
-      top: 12px;
-      z-index: 20;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      pointer-events: none;
-    }
+  #guides{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    display:none;
+    z-index:12;
+  }
 
-    .chip {
-      pointer-events: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      background: var(--panel);
-      color: var(--text);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-    }
+  #guides::before,
+  #guides::after{
+    content:"";
+    position:absolute;
+    background:rgba(255,255,255,.16);
+  }
 
-    .chip b {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: .2px;
-    }
+  #guides::before{
+    left:50%;
+    top:0;
+    width:1px;
+    height:100%;
+    transform:translateX(-.5px);
+  }
 
-    .small {
-      font-size: 12px;
-      color: var(--muted);
-    }
+  #guides::after{
+    top:50%;
+    left:0;
+    width:100%;
+    height:1px;
+    transform:translateY(-.5px);
+  }
 
-    #bottomPanel {
-      position: fixed;
-      left: 12px;
-      right: 12px;
-      bottom: 12px;
-      z-index: 20;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      background: var(--panel);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      box-shadow: 0 16px 40px rgba(0,0,0,.35);
-      color: var(--text);
-    }
+  .gridLine{
+    position:absolute;
+    pointer-events:none;
+    background:rgba(255,255,255,.08);
+  }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+  .v1{ left:33.333%; top:0; width:1px; height:100%; }
+  .v2{ left:66.666%; top:0; width:1px; height:100%; }
+  .h1{ top:33.333%; left:0; height:1px; width:100%; }
+  .h2{ top:66.666%; left:0; height:1px; width:100%; }
 
-    .btn, .fileBtn {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: var(--panel2);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 11px 14px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: center;
-    }
+  #topBar{
+    position:fixed;
+    left:12px;
+    right:12px;
+    top:12px;
+    z-index:20;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    pointer-events:none;
+  }
 
-    .btn:active, .fileBtn:active {
-      transform: scale(0.98);
-    }
+  .chip{
+    pointer-events:auto;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:16px;
+    background:var(--panel);
+    color:var(--text);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:0 10px 30px rgba(0,0,0,.26);
+  }
 
-    .fileBtn {
-      position: relative;
-      overflow: hidden;
-    }
+  .chip b{
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:.2px;
+  }
 
-    .fileBtn input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
-    }
+  .chip span{
+    font-size:12px;
+    color:var(--muted);
+  }
 
-    .sliderWrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 12px;
-    }
+  #bottomPanel{
+    position:fixed;
+    left:12px;
+    right:12px;
+    bottom:12px;
+    z-index:20;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:22px;
+    background:var(--panel);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:0 16px 40px rgba(0,0,0,.36);
+    color:var(--text);
+  }
 
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
+  .row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
 
-    .label {
-      min-width: 78px;
-      font-size: 13px;
-      color: var(--muted);
-    }
+  .row + .row{
+    margin-top:8px;
+  }
 
-    .hint {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
+  .btn, .fileBtn{
+    appearance:none;
+    border:1px solid var(--border);
+    background:var(--panel-2);
+    color:var(--text);
+    border-radius:14px;
+    padding:10px 12px;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    text-align:center;
+    line-height:1;
+  }
 
-    #loader {
-      position: fixed;
-      inset: 0;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      background: radial-gradient(circle at center, rgba(35,45,60,.95), rgba(0,0,0,.97));
-    }
+  .btn:active, .fileBtn:active{
+    transform:scale(.98);
+  }
 
-    #loaderBox {
-      text-align: center;
-      max-width: 320px;
-      padding: 24px;
-    }
+  .btn.primary{
+    background:rgba(139,211,255,.16);
+    border-color:rgba(139,211,255,.28);
+  }
 
-    #loaderBox h1 {
-      margin: 0 0 10px;
-      font-size: 22px;
-    }
+  .btn.good{
+    background:rgba(143,255,187,.14);
+    border-color:rgba(143,255,187,.26);
+  }
 
-    #loaderBox p {
-      margin: 0;
-      color: rgba(255,255,255,.75);
-      line-height: 1.6;
-      font-size: 14px;
-    }
+  .btn.warn{
+    background:rgba(255,143,143,.12);
+    border-color:rgba(255,143,143,.24);
+  }
 
-    #errorMsg {
-      margin-top: 14px;
-      color: #ffb4b4;
-      font-size: 13px;
-    }
-  </style>
+  .fileBtn{
+    position:relative;
+    overflow:hidden;
+  }
+
+  .fileBtn input{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    opacity:0;
+    cursor:pointer;
+  }
+
+  .sliderWrap{
+    display:grid;
+    grid-template-columns:92px 1fr 54px;
+    align-items:center;
+    gap:10px;
+    margin-top:10px;
+  }
+
+  .label{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .value{
+    font-size:12px;
+    color:var(--text);
+    text-align:right;
+  }
+
+  input[type="range"]{
+    width:100%;
+    accent-color:var(--accent);
+  }
+
+  .hint{
+    margin-top:10px;
+    font-size:12px;
+    line-height:1.45;
+    color:var(--muted);
+  }
+
+  #loader{
+    position:fixed;
+    inset:0;
+    z-index:40;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:radial-gradient(circle at center, rgba(28,34,44,.96), rgba(0,0,0,.98));
+    color:#fff;
+  }
+
+  #loaderBox{
+    width:min(340px, calc(100vw - 36px));
+    text-align:center;
+    padding:24px;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:24px;
+    background:rgba(255,255,255,.05);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+  }
+
+  #loaderBox h1{
+    margin:0 0 10px;
+    font-size:22px;
+  }
+
+  #loaderBox p{
+    margin:0;
+    color:rgba(255,255,255,.78);
+    font-size:14px;
+    line-height:1.6;
+  }
+
+  #errorMsg{
+    margin-top:14px;
+    color:#ffb4b4;
+    font-size:13px;
+    line-height:1.5;
+  }
+
+  #showUiBtn{
+    position:fixed;
+    right:12px;
+    top:12px;
+    z-index:30;
+    display:none;
+  }
+
+  .hideUI #topBar,
+  .hideUI #bottomPanel{
+    display:none !important;
+  }
+
+  .hideUI #showUiBtn{
+    display:inline-flex;
+  }
+</style>
 </head>
 <body>
-  <div id="loader">
-    <div id="loaderBox">
-      <h1>AR Trace</h1>
-      <p>شغل الكاميرا، ارفع الصورة، ثم حرّكها بإصبعك وكبّرها بإصبعين.</p>
-      <div id="errorMsg"></div>
-    </div>
+<div id="app">
+  <video id="camera" autoplay playsinline muted></video>
+
+  <div id="overlayWrap" aria-label="image overlay">
+    <img id="overlayImg" alt="overlay" />
   </div>
 
-  <div id="stage">
-    <video id="camera" autoplay playsinline muted></video>
-    <div id="overlayWrap">
-      <img id="overlayImg" alt="overlay" />
-    </div>
+  <div id="guides">
+    <div class="gridLine v1"></div>
+    <div class="gridLine v2"></div>
+    <div class="gridLine h1"></div>
+    <div class="gridLine h2"></div>
+  </div>
+</div>
+
+<div id="loader">
+  <div id="loaderBox">
+    <h1>AR Trace Pro</h1>
+    <p>Load an image, place it over paper, then drag, pinch, rotate, and trace in real life.</p>
+    <div id="errorMsg"></div>
+  </div>
+</div>
+
+<button class="chip" id="showUiBtn">Show UI</button>
+
+<div id="topBar">
+  <div class="chip">
+    <b>AR Trace Pro</b>
+    <span id="statusText">Loading...</span>
+  </div>
+  <div class="chip">
+    <span id="modeText">Normal</span>
+  </div>
+</div>
+
+<div id="bottomPanel">
+  <div class="row">
+    <label class="fileBtn primary">
+      Load Image
+      <input id="fileInput" type="file" accept="image/*" />
+    </label>
+
+    <button class="btn" id="fitBtn">Fit</button>
+    <button class="btn" id="resetBtn">Reset</button>
+    <button class="btn" id="lockBtn">Lock: Off</button>
+    <button class="btn" id="uiBtn">Hide UI</button>
+    <button class="btn" id="fullBtn">Fullscreen</button>
   </div>
 
-  <div id="hud">
-    <div class="chip">
-      <b>Trace</b>
-      <span class="small">Camera overlay</span>
-    </div>
-    <div class="chip">
-      <span id="statusText" class="small">جاهز</span>
-    </div>
+  <div class="row">
+    <button class="btn good" id="normalBtn">Normal</button>
+    <button class="btn good" id="outlineBtn">Outline</button>
+    <button class="btn" id="mirrorBtn">Mirror</button>
+    <button class="btn" id="rotateLeftBtn">Rotate -90°</button>
+    <button class="btn" id="rotateRightBtn">Rotate +90°</button>
+    <button class="btn" id="cameraBtn">Switch Camera</button>
+    <button class="btn" id="guidesBtn">Guides: Off</button>
   </div>
 
-  <div id="bottomPanel">
-    <div class="row">
-      <label class="fileBtn">
-        اختر صورة
-        <input id="fileInput" type="file" accept="image/*" />
-      </label>
-      <button class="btn" id="resetBtn">إعادة ضبط</button>
-      <button class="btn" id="fitBtn">ملاءمة</button>
-    </div>
-
-    <div class="sliderWrap">
-      <div class="label">الشفافية</div>
-      <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.55" />
-    </div>
-
-    <div class="sliderWrap">
-      <div class="label">الحجم</div>
-      <input id="sizeRange" type="range" min="120" max="900" step="1" value="320" />
-    </div>
-
-    <div class="hint">
-      اسحب الصورة بإصبع واحد. كبّر أو صغّر بإصبعين. ثبت الجوال على حامل لنتيجة أدق.
-    </div>
+  <div class="sliderWrap">
+    <div class="label">Opacity</div>
+    <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.58" />
+    <div class="value" id="opacityValue">58%</div>
   </div>
+
+  <div class="sliderWrap">
+    <div class="label">Scale</div>
+    <input id="scaleRange" type="range" min="0.15" max="5" step="0.01" value="1" />
+    <div class="value" id="scaleValue">1.00x</div>
+  </div>
+
+  <div class="sliderWrap">
+    <div class="label">Brightness</div>
+    <input id="brightnessRange" type="range" min="0" max="2" step="0.01" value="1" />
+    <div class="value" id="brightnessValue">1.00</div>
+  </div>
+
+  <div class="sliderWrap">
+    <div class="label">Contrast</div>
+    <input id="contrastRange" type="range" min="0" max="3" step="0.01" value="1" />
+    <div class="value" id="contrastValue">1.00</div>
+  </div>
+
+  <div class="sliderWrap">
+    <div class="label">Saturation</div>
+    <input id="saturationRange" type="range" min="0" max="3" step="0.01" value="1" />
+    <div class="value" id="saturationValue">1.00</div>
+  </div>
+
+  <div class="sliderWrap">
+    <div class="label">Blur</div>
+    <input id="blurRange" type="range" min="0" max="8" step="0.1" value="0" />
+    <div class="value" id="blurValue">0.0px</div>
+  </div>
+
+  <div class="hint">
+    One finger moves the image. Two fingers pinch to zoom and rotate. Keep the phone on a stand for the best tracing accuracy.
+  </div>
+</div>
 
 <script>
 (() => {
+  const LS_KEY = 'ar_trace_pro_settings_v1';
+
   const camera = document.getElementById('camera');
   const overlayWrap = document.getElementById('overlayWrap');
   const overlayImg = document.getElementById('overlayImg');
   const fileInput = document.getElementById('fileInput');
-  const opacityRange = document.getElementById('opacityRange');
-  const sizeRange = document.getElementById('sizeRange');
-  const resetBtn = document.getElementById('resetBtn');
-  const fitBtn = document.getElementById('fitBtn');
+
   const statusText = document.getElementById('statusText');
+  const modeText = document.getElementById('modeText');
   const loader = document.getElementById('loader');
   const errorMsg = document.getElementById('errorMsg');
 
-  let stream = null;
+  const fitBtn = document.getElementById('fitBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const lockBtn = document.getElementById('lockBtn');
+  const uiBtn = document.getElementById('uiBtn');
+  const fullBtn = document.getElementById('fullBtn');
+  const normalBtn = document.getElementById('normalBtn');
+  const outlineBtn = document.getElementById('outlineBtn');
+  const mirrorBtn = document.getElementById('mirrorBtn');
+  const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+  const rotateRightBtn = document.getElementById('rotateRightBtn');
+  const cameraBtn = document.getElementById('cameraBtn');
+  const guidesBtn = document.getElementById('guidesBtn');
+  const showUiBtn = document.getElementById('showUiBtn');
 
-  let state = {
-    x: 0,
-    y: 0,
+  const opacityRange = document.getElementById('opacityRange');
+  const scaleRange = document.getElementById('scaleRange');
+  const brightnessRange = document.getElementById('brightnessRange');
+  const contrastRange = document.getElementById('contrastRange');
+  const saturationRange = document.getElementById('saturationRange');
+  const blurRange = document.getElementById('blurRange');
+
+  const opacityValue = document.getElementById('opacityValue');
+  const scaleValue = document.getElementById('scaleValue');
+  const brightnessValue = document.getElementById('brightnessValue');
+  const contrastValue = document.getElementById('contrastValue');
+  const saturationValue = document.getElementById('saturationValue');
+  const blurValue = document.getElementById('blurValue');
+
+  const state = {
+    cx: window.innerWidth / 2,
+    cy: window.innerHeight / 2,
+    baseW: 340,
+    baseH: 340,
     scale: 1,
-    baseW: 320,
-    baseH: 320,
-    opacity: 0.55
+    rotation: 0,
+    flipX: 1,
+    opacity: 0.58,
+    brightness: 1,
+    contrast: 1,
+    saturation: 1,
+    blur: 0,
+    mode: 'normal',
+    locked: false,
+    guides: false,
+    uiHidden: false,
+    facingMode: 'environment',
+    originalSrc: '',
+    outlineSrc: ''
   };
 
+  let stream = null;
   const pointers = new Map();
-  let dragStart = null;
-  let pinchStart = null;
-
-  function setStatus(text) {
-    statusText.textContent = text;
-  }
+  let gesture = null;
+  let drag = null;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
 
-  function applyTransform() {
-    overlayWrap.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+  function setStatus(text) {
+    statusText.textContent = text;
+  }
+
+  function setMode(text) {
+    modeText.textContent = text;
+  }
+
+  function saveSettings() {
+    const data = {
+      cx: state.cx,
+      cy: state.cy,
+      baseW: state.baseW,
+      baseH: state.baseH,
+      scale: state.scale,
+      rotation: state.rotation,
+      flipX: state.flipX,
+      opacity: state.opacity,
+      brightness: state.brightness,
+      contrast: state.contrast,
+      saturation: state.saturation,
+      blur: state.blur,
+      mode: state.mode,
+      locked: state.locked,
+      guides: state.guides,
+      uiHidden: state.uiHidden,
+      facingMode: state.facingMode
+    };
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      Object.assign(state, data || {});
+    } catch (_) {}
+  }
+
+  function updateUIValues() {
+    opacityRange.value = String(state.opacity);
+    scaleRange.value = String(state.scale);
+    brightnessRange.value = String(state.brightness);
+    contrastRange.value = String(state.contrast);
+    saturationRange.value = String(state.saturation);
+    blurRange.value = String(state.blur);
+
+    opacityValue.textContent = `${Math.round(state.opacity * 100)}%`;
+    scaleValue.textContent = `${state.scale.toFixed(2)}x`;
+    brightnessValue.textContent = state.brightness.toFixed(2);
+    contrastValue.textContent = state.contrast.toFixed(2);
+    saturationValue.textContent = state.saturation.toFixed(2);
+    blurValue.textContent = `${state.blur.toFixed(1)}px`;
+
+    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
+    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
+    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
+    if (state.mode === 'outline') {
+      setMode('Outline');
+    } else {
+      setMode('Normal');
+    }
+
+    document.body.classList.toggle('hideUI', state.uiHidden);
+    document.getElementById('guides').style.display = state.guides ? 'block' : 'none';
+  }
+
+  function updateOverlay() {
+    overlayWrap.style.left = `${state.cx}px`;
+    overlayWrap.style.top = `${state.cy}px`;
+    overlayWrap.style.width = `${state.baseW}px`;
+    overlayWrap.style.height = `${state.baseH}px`;
     overlayWrap.style.opacity = String(state.opacity);
-    overlayImg.style.width = `${state.baseW}px`;
+    overlayWrap.style.transform = `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
+
+    overlayImg.style.filter = `brightness(${state.brightness}) contrast(${state.contrast}) saturate(${state.saturation}) blur(${state.blur}px)`;
+
+    updateUIValues();
+    saveSettings();
+  }
+
+  function getCurrentImageSrc() {
+    if (state.mode === 'outline' && state.outlineSrc) return state.outlineSrc;
+    return state.originalSrc || '';
+  }
+
+  function applyImageMode() {
+    const src = getCurrentImageSrc();
+    if (src) overlayImg.src = src;
+    setMode(state.mode === 'outline' ? 'Outline' : 'Normal');
+    updateOverlay();
   }
 
   function centerOverlay() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    state.x = (vw - state.baseW) / 2;
-    state.y = (vh - state.baseH) / 2;
-    applyTransform();
+    state.cx = window.innerWidth / 2;
+    state.cy = window.innerHeight / 2;
+    updateOverlay();
   }
 
-  function fitOverlayToScreen() {
+  function fitOverlay() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const target = Math.min(vw * 0.72, vh * 0.72);
-    state.baseW = target;
-    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
-      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-      state.baseH = target * ratio;
-    } else {
-      state.baseH = target;
+    const ratio = state.baseH / state.baseW || 1;
+    let w = vw * 0.72;
+    let h = w * ratio;
+    if (h > vh * 0.72) {
+      h = vh * 0.72;
+      w = h / ratio;
     }
-    sizeRange.value = String(Math.round(state.baseW));
+    state.baseW = w;
+    state.baseH = h;
     state.scale = 1;
+    scaleRange.value = '1';
     centerOverlay();
-    applyTransform();
+    setStatus('Fit applied');
+    updateOverlay();
+  }
+
+  function resetTransform() {
+    state.scale = 1;
+    state.rotation = 0;
+    state.flipX = 1;
+    state.opacity = 0.58;
+    state.brightness = 1;
+    state.contrast = 1;
+    state.saturation = 1;
+    state.blur = 0;
+    state.mode = 'normal';
+    scaleRange.value = '1';
+    opacityRange.value = '0.58';
+    brightnessRange.value = '1';
+    contrastRange.value = '1';
+    saturationRange.value = '1';
+    blurRange.value = '0';
+    applyImageMode();
+    centerOverlay();
+    setStatus('Reset done');
+  }
+
+  function rotateBy(deg) {
+    state.rotation = (state.rotation + deg) % 360;
+    updateOverlay();
+  }
+
+  function toggleMirror() {
+    state.flipX *= -1;
+    updateOverlay();
+  }
+
+  function setLock(value) {
+    state.locked = value;
+    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
+    setStatus(state.locked ? 'Locked' : 'Unlocked');
+    saveSettings();
+  }
+
+  function toggleUI() {
+    state.uiHidden = !state.uiHidden;
+    document.body.classList.toggle('hideUI', state.uiHidden);
+    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
+    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
+    saveSettings();
+  }
+
+  function toggleGuides() {
+    state.guides = !state.guides;
+    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
+    document.getElementById('guides').style.display = state.guides ? 'block' : 'none';
+    saveSettings();
+  }
+
+  function setImageBaseSizeFromLoadedImage() {
+    if (!overlayImg.naturalWidth || !overlayImg.naturalHeight) return;
+    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let w = Math.min(vw * 0.72, 460);
+    let h = w * ratio;
+    if (h > vh * 0.72) {
+      h = vh * 0.72;
+      w = h / ratio;
+    }
+    state.baseW = w;
+    state.baseH = h;
+    state.scale = 1;
+    scaleRange.value = '1';
+    centerOverlay();
+  }
+
+  async function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
   }
 
   async function startCamera() {
+    setStatus('Starting camera...');
+    errorMsg.textContent = '';
+
     try {
+      await stopCamera();
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('المتصفح لا يدعم الكاميرا');
+        throw new Error('This browser does not support camera access.');
       }
 
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: state.facingMode },
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         },
@@ -359,187 +707,434 @@
       await camera.play();
 
       loader.style.display = 'none';
-      setStatus('الكاميرا شغالة');
+      setStatus(state.facingMode === 'user' ? 'Front camera' : 'Rear camera');
+      updateOverlay();
     } catch (err) {
-      loader.style.display = 'flex';
-      errorMsg.textContent = 'ما قدرت أشغل الكاميرا. تأكد أنك فتحت الموقع عبر HTTPS وأنك سمحت بالكاميرا.';
       console.error(err);
+      loader.style.display = 'flex';
+      errorMsg.textContent =
+        'Camera failed to start. Open this site in HTTPS on Safari and allow camera permission.';
+      setStatus('Camera error');
     }
   }
 
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
+  function buildOutlineDataUrl(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1400;
+          const ratio = img.width / img.height;
+          let w = img.width;
+          let h = img.height;
+
+          if (w > h && w > maxDim) {
+            h = Math.round(h * (maxDim / w));
+            w = maxDim;
+          } else if (h >= w && h > maxDim) {
+            w = Math.round(w * (maxDim / h));
+            h = maxDim;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const srcData = ctx.getImageData(0, 0, w, h);
+          const d = srcData.data;
+
+          const gray = new Float32Array(w * h);
+          for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+            gray[p] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+          }
+
+          const out = ctx.createImageData(w, h);
+          const o = out.data;
+
+          const threshold = 42;
+          const scaleFactor = 5.5;
+
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              const i = y * w + x;
+
+              const tl = gray[i - w - 1];
+              const tc = gray[i - w];
+              const tr = gray[i - w + 1];
+              const ml = gray[i - 1];
+              const mr = gray[i + 1];
+              const bl = gray[i + w - 1];
+              const bc = gray[i + w];
+              const br = gray[i + w + 1];
+
+              const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+              const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+              const mag = Math.sqrt(gx * gx + gy * gy);
+
+              const edge = clamp((mag - threshold) * scaleFactor, 0, 255);
+              const idx = i * 4;
+
+              if (edge > 0) {
+                o[idx] = 0;
+                o[idx + 1] = 0;
+                o[idx + 2] = 0;
+                o[idx + 3] = edge;
+              } else {
+                o[idx + 3] = 0;
+              }
+            }
+          }
+
+          ctx.putImageData(out, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  async function loadImageFile(file) {
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
+    const src = URL.createObjectURL(file);
+    state.originalSrc = src;
+    state.outlineSrc = '';
+    state.mode = 'normal';
+    overlayImg.src = src;
+    setStatus('Image loaded');
+    setMode('Normal');
+
     overlayImg.onload = () => {
-      if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
-        const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-        state.baseW = Math.min(window.innerWidth * 0.72, 420);
-        state.baseH = state.baseW * ratio;
-        sizeRange.value = String(Math.round(state.baseW));
-        state.scale = 1;
-        centerOverlay();
-        applyTransform();
-        setStatus('تم تحميل الصورة');
-      }
+      setImageBaseSizeFromLoadedImage();
+      updateOverlay();
     };
-    overlayImg.src = url;
-  });
 
-  opacityRange.addEventListener('input', (e) => {
-    state.opacity = parseFloat(e.target.value);
-    applyTransform();
-  });
-
-  sizeRange.addEventListener('input', (e) => {
-    state.baseW = parseInt(e.target.value, 10);
-    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
-      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-      state.baseH = state.baseW * ratio;
-    } else {
-      state.baseH = state.baseW;
+    try {
+      setStatus('Building outline...');
+      const outline = await buildOutlineDataUrl(src);
+      state.outlineSrc = outline;
+      if (state.mode === 'outline') {
+        overlayImg.src = outline;
+      }
+      setStatus('Image ready');
+      updateOverlay();
+    } catch (e) {
+      console.error(e);
+      setStatus('Outline unavailable');
     }
-    applyTransform();
+  }
+
+  function getDistance(a, b) {
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+
+  function getAngle(a, b) {
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  }
+
+  function getCenter(a, b) {
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2
+    };
+  }
+
+  function startDrag(pointer) {
+    drag = {
+      id: pointer.id,
+      startX: pointer.x,
+      startY: pointer.y,
+      originCx: state.cx,
+      originCy: state.cy
+    };
+    setStatus('Dragging');
+  }
+
+  function startGesture(p1, p2) {
+    gesture = {
+      id1: p1.id,
+      id2: p2.id,
+      startDist: getDistance(p1, p2),
+      startAngle: getAngle(p1, p2),
+      startScale: state.scale,
+      startRotation: state.rotation,
+      startCx: state.cx,
+      startCy: state.cy,
+      startCenter: getCenter(p1, p2)
+    };
+    drag = null;
+    setStatus('Pinch / rotate');
+  }
+
+  function updateDrag(pointer) {
+    if (!drag) return;
+    const dx = pointer.x - drag.startX;
+    const dy = pointer.y - drag.startY;
+    state.cx = drag.originCx + dx;
+    state.cy = drag.originCy + dy;
+    updateOverlay();
+  }
+
+  function updateGesture(p1, p2) {
+    if (!gesture) return;
+
+    const dist = getDistance(p1, p2);
+    const angle = getAngle(p1, p2);
+    const center = getCenter(p1, p2);
+
+    state.scale = clamp(gesture.startScale * (dist / gesture.startDist), 0.15, 8);
+    state.rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180 / Math.PI);
+
+    state.cx = gesture.startCx + (center.x - gesture.startCenter.x);
+    state.cy = gesture.startCy + (center.y - gesture.startCenter.y);
+
+    scaleRange.value = String(state.scale);
+    updateOverlay();
+  }
+
+  function endPointer(pointerId) {
+    pointers.delete(pointerId);
+
+    if (state.locked) return;
+
+    if (pointers.size === 0) {
+      drag = null;
+      gesture = null;
+      setStatus(state.mode === 'outline' ? 'Outline' : 'Ready');
+      return;
+    }
+
+    if (pointers.size === 1) {
+      const p = Array.from(pointers.values())[0];
+      startDrag(p);
+      gesture = null;
+      return;
+    }
+
+    if (pointers.size >= 2) {
+      const pts = Array.from(pointers.values()).slice(0, 2);
+      startGesture(pts[0], pts[1]);
+    }
+  }
+
+  overlayWrap.addEventListener('pointerdown', e => {
+    if (state.locked) return;
+    e.preventDefault();
+
+    overlayWrap.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+
+    const pts = Array.from(pointers.values());
+    if (pts.length === 1) {
+      startDrag(pts[0]);
+    } else if (pts.length >= 2) {
+      startGesture(pts[0], pts[1]);
+    }
   });
 
-  resetBtn.addEventListener('click', () => {
-    state.scale = 1;
-    sizeRange.value = String(Math.round(state.baseW));
-    centerOverlay();
-    applyTransform();
-    setStatus('تمت الإعادة');
+  overlayWrap.addEventListener('pointermove', e => {
+    if (state.locked) return;
+    if (!pointers.has(e.pointerId)) return;
+
+    e.preventDefault();
+    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+
+    const pts = Array.from(pointers.values());
+    if (pts.length === 1 && drag) {
+      updateDrag(pts[0]);
+    } else if (pts.length >= 2 && gesture) {
+      updateGesture(pts[0], pts[1]);
+    }
+  });
+
+  overlayWrap.addEventListener('pointerup', e => {
+    if (pointers.has(e.pointerId)) {
+      endPointer(e.pointerId);
+    }
+  });
+
+  overlayWrap.addEventListener('pointercancel', e => {
+    if (pointers.has(e.pointerId)) {
+      endPointer(e.pointerId);
+    }
+  });
+
+  overlayWrap.addEventListener('pointerleave', e => {
+    if (pointers.has(e.pointerId)) {
+      endPointer(e.pointerId);
+    }
+  });
+
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (file) loadImageFile(file);
+  });
+
+  opacityRange.addEventListener('input', e => {
+    state.opacity = parseFloat(e.target.value);
+    updateOverlay();
+  });
+
+  scaleRange.addEventListener('input', e => {
+    state.scale = parseFloat(e.target.value);
+    updateOverlay();
+  });
+
+  brightnessRange.addEventListener('input', e => {
+    state.brightness = parseFloat(e.target.value);
+    updateOverlay();
+  });
+
+  contrastRange.addEventListener('input', e => {
+    state.contrast = parseFloat(e.target.value);
+    updateOverlay();
+  });
+
+  saturationRange.addEventListener('input', e => {
+    state.saturation = parseFloat(e.target.value);
+    updateOverlay();
+  });
+
+  blurRange.addEventListener('input', e => {
+    state.blur = parseFloat(e.target.value);
+    updateOverlay();
   });
 
   fitBtn.addEventListener('click', () => {
     if (!overlayImg.src) return;
-    fitOverlayToScreen();
-    setStatus('تمت الملاءمة');
+    fitOverlay();
   });
 
-  function getDistance(t1, t2) {
-    const dx = t2.clientX - t1.clientX;
-    const dy = t2.clientY - t1.clientY;
-    return Math.hypot(dx, dy);
-  }
+  resetBtn.addEventListener('click', () => {
+    if (!overlayImg.src) return;
+    resetTransform();
+  });
 
-  function getCenter(t1, t2) {
-    return {
-      x: (t1.clientX + t2.clientX) / 2,
-      y: (t1.clientY + t2.clientY) / 2
-    };
-  }
+  lockBtn.addEventListener('click', () => {
+    setLock(!state.locked);
+    updateOverlay();
+  });
 
-  overlayWrap.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    overlayWrap.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  uiBtn.addEventListener('click', toggleUI);
+  showUiBtn.addEventListener('click', toggleUI);
 
-    if (pointers.size === 1) {
-      dragStart = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        originX: state.x,
-        originY: state.y
-      };
-      setStatus('سحب');
-    }
-
-    if (pointers.size === 2) {
-      const pts = Array.from(pointers.values());
-      const ids = Array.from(pointers.keys());
-      pinchStart = {
-        id1: ids[0],
-        id2: ids[1],
-        startDist: getDistance(pts[0], pts[1]),
-        startScale: state.scale,
-        startX: state.x,
-        startY: state.y,
-        center: getCenter(pts[0], pts[1])
-      };
-      dragStart = null;
-      setStatus('تكبير/تصغير');
+  fullBtn.addEventListener('click', async () => {
+    try {
+      const el = document.documentElement;
+      if (!document.fullscreenElement && el.requestFullscreen) {
+        await el.requestFullscreen();
+        setStatus('Fullscreen on');
+      } else if (document.exitFullscreen) {
+        await document.exitFullscreen();
+        setStatus('Fullscreen off');
+      }
+    } catch (_) {
+      setStatus('Fullscreen unavailable');
     }
   });
 
-  overlayWrap.addEventListener('pointermove', (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    e.preventDefault();
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (pointers.size === 1 && dragStart) {
-      const dx = e.clientX - dragStart.startX;
-      const dy = e.clientY - dragStart.startY;
-      state.x = dragStart.originX + dx;
-      state.y = dragStart.originY + dy;
-      applyTransform();
-    }
-
-    if (pointers.size === 2 && pinchStart) {
-      const pts = Array.from(pointers.values());
-      const ids = Array.from(pointers.keys());
-      const p1 = pts[0];
-      const p2 = pts[1];
-      const dist = getDistance(p1, p2);
-      const rawScale = pinchStart.startScale * (dist / pinchStart.startDist);
-      state.scale = clamp(rawScale, 0.2, 6);
-
-      const currentCenter = getCenter(p1, p2);
-      const shiftX = currentCenter.x - pinchStart.center.x;
-      const shiftY = currentCenter.y - pinchStart.center.y;
-
-      state.x = pinchStart.startX + shiftX;
-      state.y = pinchStart.startY + shiftY;
-
-      applyTransform();
-    }
+  normalBtn.addEventListener('click', () => {
+    state.mode = 'normal';
+    applyImageMode();
+    setStatus('Normal mode');
   });
 
-  function endPointer(e) {
-    if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
+  outlineBtn.addEventListener('click', () => {
+    state.mode = 'outline';
+    applyImageMode();
+    setStatus('Outline mode');
+  });
 
-    if (pointers.size === 0) {
-      dragStart = null;
-      pinchStart = null;
-      setStatus('جاهز');
-    } else if (pointers.size === 1) {
-      const remaining = Array.from(pointers.entries())[0];
-      dragStart = {
-        pointerId: remaining[0],
-        startX: remaining[1].x,
-        startY: remaining[1].y,
-        originX: state.x,
-        originY: state.y
-      };
-      pinchStart = null;
-      setStatus('سحب');
-    }
-  }
+  mirrorBtn.addEventListener('click', () => {
+    toggleMirror();
+  });
 
-  overlayWrap.addEventListener('pointerup', endPointer);
-  overlayWrap.addEventListener('pointercancel', endPointer);
-  overlayWrap.addEventListener('pointerleave', endPointer);
+  rotateLeftBtn.addEventListener('click', () => {
+    rotateBy(-90);
+  });
+
+  rotateRightBtn.addEventListener('click', () => {
+    rotateBy(90);
+  });
+
+  cameraBtn.addEventListener('click', async () => {
+    state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+    saveSettings();
+    await startCamera();
+  });
+
+  guidesBtn.addEventListener('click', () => {
+    toggleGuides();
+  });
 
   window.addEventListener('resize', () => {
-    if (!overlayImg.src) return;
-    centerOverlay();
+    if (overlayImg.src) {
+      state.cx = window.innerWidth / 2;
+      state.cy = window.innerHeight / 2;
+      updateOverlay();
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    stopCamera();
   });
 
   overlayImg.addEventListener('load', () => {
-    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
-      const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-      state.baseW = Math.min(window.innerWidth * 0.72, 420);
-      state.baseH = state.baseW * ratio;
-      sizeRange.value = String(Math.round(state.baseW));
-      state.scale = 1;
-      centerOverlay();
-      applyTransform();
+    if (!state.baseW || !state.baseH) {
+      setImageBaseSizeFromLoadedImage();
     }
+    updateOverlay();
   });
 
-  applyTransform();
-  startCamera();
+  function restoreFromSavedSettings() {
+    loadSettings();
+
+    opacityRange.value = String(state.opacity);
+    scaleRange.value = String(state.scale);
+    brightnessRange.value = String(state.brightness);
+    contrastRange.value = String(state.contrast);
+    saturationRange.value = String(state.saturation);
+    blurRange.value = String(state.blur);
+
+    document.body.classList.toggle('hideUI', state.uiHidden);
+    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
+    state.guides ? document.getElementById('guides').style.display = 'block' : document.getElementById('guides').style.display = 'none';
+
+    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
+    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
+    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
+
+    updateUIValues();
+    updateOverlay();
+  }
+
+  async function init() {
+    restoreFromSavedSettings();
+
+    if (state.originalSrc) {
+      overlayImg.src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state.originalSrc;
+    }
+
+    await startCamera();
+
+    if (!state.originalSrc) {
+      loader.style.display = 'flex';
+      errorMsg.textContent = 'Load an image to begin.';
+      setStatus('Ready');
+    } else {
+      loader.style.display = 'none';
+      setStatus('Ready');
+      applyImageMode();
+      updateOverlay();
+    }
+  }
+
+  init();
 })();
 </script>
 </body>
