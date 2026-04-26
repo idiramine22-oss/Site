@@ -1,1141 +1,1688 @@
+Here's a complete HTML document that transforms your camera into a premium, feature-rich AR tracing tool — with all the paid app perks built right in, for free.
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>AR Trace Pro</title>
-<style>
-  :root{
-    --bg:#05070a;
-    --panel:rgba(16,20,28,.78);
-    --panel-2:rgba(255,255,255,.08);
-    --panel-3:rgba(255,255,255,.12);
-    --text:#fff;
-    --muted:rgba(255,255,255,.72);
-    --border:rgba(255,255,255,.12);
-    --accent:#8bd3ff;
-    --danger:#ff8f8f;
-    --ok:#8fffbb;
-  }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>AR Trace Pro</title>
+    <style>
+        :root {
+            --bg: #080c12;
+            --panel: rgba(14, 18, 26, 0.82);
+            --panel2: rgba(255, 255, 255, 0.06);
+            --panel3: rgba(255, 255, 255, 0.10);
+            --text: #f0f0f5;
+            --muted: rgba(255, 255, 255, 0.7);
+            --accent: #7ec8ff;
+            --accent2: #ffb74d;
+            --danger: #ff6b6b;
+            --success: #69db7c;
+            --border: rgba(255, 255, 255, 0.14);
+            --border2: rgba(255, 255, 255, 0.22);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-  html, body{
-    margin:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:var(--bg);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    -webkit-user-select:none;
-    user-select:none;
-    touch-action:none;
-  }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-  #app{
-    position:fixed;
-    inset:0;
-    background:#000;
-  }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
 
-  #camera{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    background:#000;
-  }
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: #000;
+        }
 
-  #overlayWrap{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform-origin:center center;
-    touch-action:none;
-    will-change:transform,left,top,width,height,opacity;
-    opacity:.58;
-  }
+        #camera {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+        }
 
-  #overlayImg{
-    display:block;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    -webkit-user-drag:none;
-    user-drag:none;
-    user-select:none;
-  }
+        /* Camera vignette for premium feel */
+        #vignette {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: inset 0 0 120px 40px rgba(0, 0, 0, 0.35);
+        }
 
-  #guides{
-    position:fixed;
-    inset:0;
-    pointer-events:none;
-    display:none;
-    z-index:12;
-  }
+        #overlayWrap {
+            position: absolute;
+            left: 0;
+            top: 0;
+            transform-origin: center center;
+            will-change: transform;
+            touch-action: none;
+            pointer-events: auto;
+            z-index: 5;
+            transition: opacity 0.15s ease;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+        }
 
-  #guides::before,
-  #guides::after{
-    content:"";
-    position:absolute;
-    background:rgba(255,255,255,.16);
-  }
+        #overlayImg {
+            display: block;
+            max-width: none;
+            max-height: none;
+            width: 320px;
+            height: auto;
+            pointer-events: none;
+            -webkit-user-drag: none;
+            user-drag: none;
+            user-select: none;
+            transition: filter 0.2s ease;
+        }
 
-  #guides::before{
-    left:50%;
-    top:0;
-    width:1px;
-    height:100%;
-    transform:translateX(-.5px);
-  }
+        #gridOverlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.18) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+            background-size: 25% 25%;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 2px;
+        }
 
-  #guides::after{
-    top:50%;
-    left:0;
-    width:100%;
-    height:1px;
-    transform:translateY(-.5px);
-  }
+        #crosshairOverlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+        }
 
-  .gridLine{
-    position:absolute;
-    pointer-events:none;
-    background:rgba(255,255,255,.08);
-  }
+        #crosshairOverlay::before,
+        #crosshairOverlay::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 80, 80, 0.7);
+        }
 
-  .v1{ left:33.333%; top:0; width:1px; height:100%; }
-  .v2{ left:66.666%; top:0; width:1px; height:100%; }
-  .h1{ top:33.333%; left:0; height:1px; width:100%; }
-  .h2{ top:66.666%; left:0; height:1px; width:100%; }
+        #crosshairOverlay::before {
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            transform: translateY(-50%);
+        }
 
-  #topBar{
-    position:fixed;
-    left:12px;
-    right:12px;
-    top:12px;
-    z-index:20;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    pointer-events:none;
-  }
+        #crosshairOverlay::after {
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            transform: translateX(-50%);
+        }
 
-  .chip{
-    pointer-events:auto;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:16px;
-    background:var(--panel);
-    color:var(--text);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:0 10px 30px rgba(0,0,0,.26);
-  }
+        #lockShield {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+            border: 3px dashed rgba(255, 100, 100, 0.7);
+            border-radius: 6px;
+            animation: lockPulse 2s ease-in-out infinite;
+        }
 
-  .chip b{
-    font-size:14px;
-    font-weight:800;
-    letter-spacing:.2px;
-  }
+        @keyframes lockPulse {
+            0%,
+            100% {
+                border-color: rgba(255, 100, 100, 0.7);
+            }
+            50% {
+                border-color: rgba(255, 100, 100, 0.2);
+            }
+        }
 
-  .chip span{
-    font-size:12px;
-    color:var(--muted);
-  }
+        /* ---- HUD ---- */
+        #hud {
+            position: fixed;
+            left: 10px;
+            right: 10px;
+            top: max(10px, env(safe-area-inset-top, 10px));
+            z-index: 30;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            flex-wrap: wrap;
+        }
 
-  #bottomPanel{
-    position:fixed;
-    left:12px;
-    right:12px;
-    bottom:12px;
-    z-index:20;
-    padding:12px;
-    border:1px solid var(--border);
-    border-radius:22px;
-    background:var(--panel);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:0 16px 40px rgba(0,0,0,.36);
-    color:var(--text);
-  }
+        .hud-chip {
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 13px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--panel);
+            color: var(--text);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.1px;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
 
-  .row{
-    display:flex;
-    gap:8px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
+        .hud-chip.dim {
+            opacity: 0.8;
+            font-size: 12px;
+        }
 
-  .row + .row{
-    margin-top:8px;
-  }
+        .hud-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .hud-dot.on {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: dotGlow 1.5s ease-in-out infinite;
+        }
+        .hud-dot.off {
+            background: #555;
+        }
+        .hud-dot.warn {
+            background: var(--accent2);
+            box-shadow: 0 0 8px var(--accent2);
+            animation: dotGlow 1s ease-in-out infinite;
+        }
 
-  .btn, .fileBtn{
-    appearance:none;
-    border:1px solid var(--border);
-    background:var(--panel-2);
-    color:var(--text);
-    border-radius:14px;
-    padding:10px 12px;
-    font-size:13px;
-    font-weight:700;
-    cursor:pointer;
-    text-align:center;
-    line-height:1;
-  }
+        @keyframes dotGlow {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.4;
+            }
+        }
 
-  .btn:active, .fileBtn:active{
-    transform:scale(.98);
-  }
+        .icon-btn {
+            pointer-events: auto;
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            flex-shrink: 0;
+            padding: 0;
+            line-height: 1;
+        }
+        .icon-btn:active {
+            transform: scale(0.9);
+        }
+        .icon-btn.active {
+            background: rgba(126, 200, 255, 0.25);
+            border-color: var(--accent);
+            box-shadow: 0 0 14px rgba(126, 200, 255, 0.35);
+        }
 
-  .btn.primary{
-    background:rgba(139,211,255,.16);
-    border-color:rgba(139,211,255,.28);
-  }
+        /* ---- Bottom Panel ---- */
+        #bottomPanel {
+            position: fixed;
+            left: 8px;
+            right: 8px;
+            bottom: max(8px, env(safe-area-inset-bottom, 8px));
+            z-index: 30;
+            padding: 14px 12px 10px;
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            background: var(--panel);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            box-shadow: var(--shadow);
+            color: var(--text);
+            transition: var(--transition);
+            max-height: 55vh;
+            overflow-y: auto;
+        }
 
-  .btn.good{
-    background:rgba(143,255,187,.14);
-    border-color:rgba(143,255,187,.26);
-  }
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .row:last-child {
+            margin-bottom: 0;
+        }
+        .row.centered {
+            justify-content: center;
+        }
 
-  .btn.warn{
-    background:rgba(255,143,143,.12);
-    border-color:rgba(255,143,143,.24);
-  }
+        .btn {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 10px 13px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: var(--transition);
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+            flex-shrink: 0;
+        }
+        .btn:active {
+            transform: scale(0.95);
+            background: var(--panel3);
+        }
+        .btn.accent {
+            background: rgba(126, 200, 255, 0.2);
+            border-color: rgba(126, 200, 255, 0.4);
+            color: #c8e6ff;
+        }
+        .btn.accent:active {
+            background: rgba(126, 200, 255, 0.35);
+        }
+        .btn.danger {
+            background: rgba(255, 107, 107, 0.2);
+            border-color: rgba(255, 107, 107, 0.4);
+            color: #ffcdcd;
+        }
 
-  .fileBtn{
-    position:relative;
-    overflow:hidden;
-  }
+        .fileBtn {
+            position: relative;
+            overflow: hidden;
+        }
+        .fileBtn input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
 
-  .fileBtn input{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    opacity:0;
-    cursor:pointer;
-  }
+        .sliderWrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 120px;
+        }
+        .sliderWrap .lbl {
+            font-size: 11px;
+            color: var(--muted);
+            min-width: 44px;
+            text-align: right;
+            flex-shrink: 0;
+            letter-spacing: 0.3px;
+        }
+        input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+            height: 6px;
+            cursor: pointer;
+        }
 
-  .sliderWrap{
-    display:grid;
-    grid-template-columns:92px 1fr 54px;
-    align-items:center;
-    gap:10px;
-    margin-top:10px;
-  }
+        .preset-row {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .preset-chip {
+            font-size: 11px;
+            padding: 6px 10px;
+            border-radius: 14px;
+            border: 1px solid var(--border2);
+            background: var(--panel2);
+            color: var(--muted);
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .preset-chip:active,
+        .preset-chip.on {
+            background: rgba(126, 200, 255, 0.3);
+            color: #fff;
+            border-color: var(--accent);
+        }
 
-  .label{
-    font-size:12px;
-    color:var(--muted);
-  }
+        .divider {
+            width: 1px;
+            height: 18px;
+            background: var(--border);
+            flex-shrink: 0;
+            margin: 0 2px;
+        }
 
-  .value{
-    font-size:12px;
-    color:var(--text);
-    text-align:right;
-  }
+        .hint {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.45);
+            line-height: 1.4;
+            text-align: center;
+            margin-top: 4px;
+        }
 
-  input[type="range"]{
-    width:100%;
-    accent-color:var(--accent);
-  }
+        /* ---- Timer popup ---- */
+        #timerDisplay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            font-size: 52px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 30px rgba(0, 0, 0, 0.9), 0 0 60px rgba(0, 0, 0, 0.7);
+            pointer-events: none;
+            display: none;
+            letter-spacing: 2px;
+            font-variant-numeric: tabular-nums;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+        }
+        #timerDisplay.urgent {
+            color: #ff6b6b;
+            animation: timerBlink 0.5s ease-in-out infinite;
+        }
+        @keyframes timerBlink {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
 
-  .hint{
-    margin-top:10px;
-    font-size:12px;
-    line-height:1.45;
-    color:var(--muted);
-  }
+        /* ---- Flash toast ---- */
+        #toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
 
-  #loader{
-    position:fixed;
-    inset:0;
-    z-index:40;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:radial-gradient(circle at center, rgba(28,34,44,.96), rgba(0,0,0,.98));
-    color:#fff;
-  }
+        /* ---- Loader ---- */
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            background: radial-gradient(circle at center, rgba(20, 28, 40, 0.97), rgba(0, 0, 0, 0.99));
+            transition: opacity 0.5s ease;
+        }
+        #loader.fadeout {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #loaderBox {
+            text-align: center;
+            max-width: 340px;
+            padding: 30px;
+        }
+        #loaderBox h1 {
+            margin: 0 0 8px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        #loaderBox p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        #errorMsg {
+            margin-top: 14px;
+            color: #ffb4b4;
+            font-size: 13px;
+            line-height: 1.5;
+        }
 
-  #loaderBox{
-    width:min(340px, calc(100vw - 36px));
-    text-align:center;
-    padding:24px;
-    border:1px solid rgba(255,255,255,.12);
-    border-radius:24px;
-    background:rgba(255,255,255,.05);
-    backdrop-filter:blur(20px);
-    -webkit-backdrop-filter:blur(20px);
-  }
+        /* Scrollbar */
+        #bottomPanel::-webkit-scrollbar {
+            width: 3px;
+        }
+        #bottomPanel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
 
-  #loaderBox h1{
-    margin:0 0 10px;
-    font-size:22px;
-  }
+        /* Recent images strip */
+        #recentStrip {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 4px 0;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        #recentStrip::-webkit-scrollbar {
+            height: 2px;
+        }
+        #recentStrip::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        .recent-thumb {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            object-fit: cover;
+            background: #1a1a2e;
+            scroll-snap-align: start;
+            transition: var(--transition);
+        }
+        .recent-thumb:active,
+        .recent-thumb.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(126, 200, 255, 0.4);
+        }
 
-  #loaderBox p{
-    margin:0;
-    color:rgba(255,255,255,.78);
-    font-size:14px;
-    line-height:1.6;
-  }
-
-  #errorMsg{
-    margin-top:14px;
-    color:#ffb4b4;
-    font-size:13px;
-    line-height:1.5;
-  }
-
-  #showUiBtn{
-    position:fixed;
-    right:12px;
-    top:12px;
-    z-index:30;
-    display:none;
-  }
-
-  .hideUI #topBar,
-  .hideUI #bottomPanel{
-    display:none !important;
-  }
-
-  .hideUI #showUiBtn{
-    display:inline-flex;
-  }
-</style>
+        @media (max-width: 400px) {
+            .btn {
+                padding: 9px 10px;
+                font-size: 11px;
+            }
+            .icon-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+            .hud-chip {
+                padding: 7px 10px;
+                font-size: 11px;
+                gap: 5px;
+            }
+            #bottomPanel {
+                padding: 10px 8px 8px;
+                border-radius: 18px;
+            }
+        }
+    </style>
 </head>
 <body>
-<div id="app">
-  <video id="camera" autoplay playsinline muted></video>
-
-  <div id="overlayWrap" aria-label="image overlay">
-    <img id="overlayImg" alt="overlay" />
-  </div>
-
-  <div id="guides">
-    <div class="gridLine v1"></div>
-    <div class="gridLine v2"></div>
-    <div class="gridLine h1"></div>
-    <div class="gridLine h2"></div>
-  </div>
-</div>
-
-<div id="loader">
-  <div id="loaderBox">
-    <h1>AR Trace Pro</h1>
-    <p>Load an image, place it over paper, then drag, pinch, rotate, and trace in real life.</p>
-    <div id="errorMsg"></div>
-  </div>
-</div>
-
-<button class="chip" id="showUiBtn">Show UI</button>
-
-<div id="topBar">
-  <div class="chip">
-    <b>AR Trace Pro</b>
-    <span id="statusText">Loading...</span>
-  </div>
-  <div class="chip">
-    <span id="modeText">Normal</span>
-  </div>
-</div>
-
-<div id="bottomPanel">
-  <div class="row">
-    <label class="fileBtn primary">
-      Load Image
-      <input id="fileInput" type="file" accept="image/*" />
-    </label>
-
-    <button class="btn" id="fitBtn">Fit</button>
-    <button class="btn" id="resetBtn">Reset</button>
-    <button class="btn" id="lockBtn">Lock: Off</button>
-    <button class="btn" id="uiBtn">Hide UI</button>
-    <button class="btn" id="fullBtn">Fullscreen</button>
-  </div>
-
-  <div class="row">
-    <button class="btn good" id="normalBtn">Normal</button>
-    <button class="btn good" id="outlineBtn">Outline</button>
-    <button class="btn" id="mirrorBtn">Mirror</button>
-    <button class="btn" id="rotateLeftBtn">Rotate -90°</button>
-    <button class="btn" id="rotateRightBtn">Rotate +90°</button>
-    <button class="btn" id="cameraBtn">Switch Camera</button>
-    <button class="btn" id="guidesBtn">Guides: Off</button>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Opacity</div>
-    <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.58" />
-    <div class="value" id="opacityValue">58%</div>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Scale</div>
-    <input id="scaleRange" type="range" min="0.15" max="5" step="0.01" value="1" />
-    <div class="value" id="scaleValue">1.00x</div>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Brightness</div>
-    <input id="brightnessRange" type="range" min="0" max="2" step="0.01" value="1" />
-    <div class="value" id="brightnessValue">1.00</div>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Contrast</div>
-    <input id="contrastRange" type="range" min="0" max="3" step="0.01" value="1" />
-    <div class="value" id="contrastValue">1.00</div>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Saturation</div>
-    <input id="saturationRange" type="range" min="0" max="3" step="0.01" value="1" />
-    <div class="value" id="saturationValue">1.00</div>
-  </div>
-
-  <div class="sliderWrap">
-    <div class="label">Blur</div>
-    <input id="blurRange" type="range" min="0" max="8" step="0.1" value="0" />
-    <div class="value" id="blurValue">0.0px</div>
-  </div>
-
-  <div class="hint">
-    One finger moves the image. Two fingers pinch to zoom and rotate. Keep the phone on a stand for the best tracing accuracy.
-  </div>
-</div>
-
-<script>
-(() => {
-  const LS_KEY = 'ar_trace_pro_settings_v1';
-
-  const camera = document.getElementById('camera');
-  const overlayWrap = document.getElementById('overlayWrap');
-  const overlayImg = document.getElementById('overlayImg');
-  const fileInput = document.getElementById('fileInput');
-
-  const statusText = document.getElementById('statusText');
-  const modeText = document.getElementById('modeText');
-  const loader = document.getElementById('loader');
-  const errorMsg = document.getElementById('errorMsg');
-
-  const fitBtn = document.getElementById('fitBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const lockBtn = document.getElementById('lockBtn');
-  const uiBtn = document.getElementById('uiBtn');
-  const fullBtn = document.getElementById('fullBtn');
-  const normalBtn = document.getElementById('normalBtn');
-  const outlineBtn = document.getElementById('outlineBtn');
-  const mirrorBtn = document.getElementById('mirrorBtn');
-  const rotateLeftBtn = document.getElementById('rotateLeftBtn');
-  const rotateRightBtn = document.getElementById('rotateRightBtn');
-  const cameraBtn = document.getElementById('cameraBtn');
-  const guidesBtn = document.getElementById('guidesBtn');
-  const showUiBtn = document.getElementById('showUiBtn');
-
-  const opacityRange = document.getElementById('opacityRange');
-  const scaleRange = document.getElementById('scaleRange');
-  const brightnessRange = document.getElementById('brightnessRange');
-  const contrastRange = document.getElementById('contrastRange');
-  const saturationRange = document.getElementById('saturationRange');
-  const blurRange = document.getElementById('blurRange');
-
-  const opacityValue = document.getElementById('opacityValue');
-  const scaleValue = document.getElementById('scaleValue');
-  const brightnessValue = document.getElementById('brightnessValue');
-  const contrastValue = document.getElementById('contrastValue');
-  const saturationValue = document.getElementById('saturationValue');
-  const blurValue = document.getElementById('blurValue');
-
-  const state = {
-    cx: window.innerWidth / 2,
-    cy: window.innerHeight / 2,
-    baseW: 340,
-    baseH: 340,
-    scale: 1,
-    rotation: 0,
-    flipX: 1,
-    opacity: 0.58,
-    brightness: 1,
-    contrast: 1,
-    saturation: 1,
-    blur: 0,
-    mode: 'normal',
-    locked: false,
-    guides: false,
-    uiHidden: false,
-    facingMode: 'environment',
-    originalSrc: '',
-    outlineSrc: ''
-  };
-
-  let stream = null;
-  const pointers = new Map();
-  let gesture = null;
-  let drag = null;
-
-  function clamp(n, min, max) {
-    return Math.max(min, Math.min(max, n));
-  }
-
-  function setStatus(text) {
-    statusText.textContent = text;
-  }
-
-  function setMode(text) {
-    modeText.textContent = text;
-  }
-
-  function saveSettings() {
-    const data = {
-      cx: state.cx,
-      cy: state.cy,
-      baseW: state.baseW,
-      baseH: state.baseH,
-      scale: state.scale,
-      rotation: state.rotation,
-      flipX: state.flipX,
-      opacity: state.opacity,
-      brightness: state.brightness,
-      contrast: state.contrast,
-      saturation: state.saturation,
-      blur: state.blur,
-      mode: state.mode,
-      locked: state.locked,
-      guides: state.guides,
-      uiHidden: state.uiHidden,
-      facingMode: state.facingMode
-    };
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(data));
-    } catch (_) {}
-  }
-
-  function loadSettings() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      Object.assign(state, data || {});
-    } catch (_) {}
-  }
-
-  function updateUIValues() {
-    opacityRange.value = String(state.opacity);
-    scaleRange.value = String(state.scale);
-    brightnessRange.value = String(state.brightness);
-    contrastRange.value = String(state.contrast);
-    saturationRange.value = String(state.saturation);
-    blurRange.value = String(state.blur);
-
-    opacityValue.textContent = `${Math.round(state.opacity * 100)}%`;
-    scaleValue.textContent = `${state.scale.toFixed(2)}x`;
-    brightnessValue.textContent = state.brightness.toFixed(2);
-    contrastValue.textContent = state.contrast.toFixed(2);
-    saturationValue.textContent = state.saturation.toFixed(2);
-    blurValue.textContent = `${state.blur.toFixed(1)}px`;
-
-    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
-    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
-    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
-    if (state.mode === 'outline') {
-      setMode('Outline');
-    } else {
-      setMode('Normal');
-    }
-
-    document.body.classList.toggle('hideUI', state.uiHidden);
-    document.getElementById('guides').style.display = state.guides ? 'block' : 'none';
-  }
-
-  function updateOverlay() {
-    overlayWrap.style.left = `${state.cx}px`;
-    overlayWrap.style.top = `${state.cy}px`;
-    overlayWrap.style.width = `${state.baseW}px`;
-    overlayWrap.style.height = `${state.baseH}px`;
-    overlayWrap.style.opacity = String(state.opacity);
-    overlayWrap.style.transform = `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
-
-    overlayImg.style.filter = `brightness(${state.brightness}) contrast(${state.contrast}) saturate(${state.saturation}) blur(${state.blur}px)`;
-
-    updateUIValues();
-    saveSettings();
-  }
-
-  function getCurrentImageSrc() {
-    if (state.mode === 'outline' && state.outlineSrc) return state.outlineSrc;
-    return state.originalSrc || '';
-  }
-
-  function applyImageMode() {
-    const src = getCurrentImageSrc();
-    if (src) overlayImg.src = src;
-    setMode(state.mode === 'outline' ? 'Outline' : 'Normal');
-    updateOverlay();
-  }
-
-  function centerOverlay() {
-    state.cx = window.innerWidth / 2;
-    state.cy = window.innerHeight / 2;
-    updateOverlay();
-  }
-
-  function fitOverlay() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const ratio = state.baseH / state.baseW || 1;
-    let w = vw * 0.72;
-    let h = w * ratio;
-    if (h > vh * 0.72) {
-      h = vh * 0.72;
-      w = h / ratio;
-    }
-    state.baseW = w;
-    state.baseH = h;
-    state.scale = 1;
-    scaleRange.value = '1';
-    centerOverlay();
-    setStatus('Fit applied');
-    updateOverlay();
-  }
-
-  function resetTransform() {
-    state.scale = 1;
-    state.rotation = 0;
-    state.flipX = 1;
-    state.opacity = 0.58;
-    state.brightness = 1;
-    state.contrast = 1;
-    state.saturation = 1;
-    state.blur = 0;
-    state.mode = 'normal';
-    scaleRange.value = '1';
-    opacityRange.value = '0.58';
-    brightnessRange.value = '1';
-    contrastRange.value = '1';
-    saturationRange.value = '1';
-    blurRange.value = '0';
-    applyImageMode();
-    centerOverlay();
-    setStatus('Reset done');
-  }
-
-  function rotateBy(deg) {
-    state.rotation = (state.rotation + deg) % 360;
-    updateOverlay();
-  }
-
-  function toggleMirror() {
-    state.flipX *= -1;
-    updateOverlay();
-  }
-
-  function setLock(value) {
-    state.locked = value;
-    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
-    setStatus(state.locked ? 'Locked' : 'Unlocked');
-    saveSettings();
-  }
-
-  function toggleUI() {
-    state.uiHidden = !state.uiHidden;
-    document.body.classList.toggle('hideUI', state.uiHidden);
-    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
-    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
-    saveSettings();
-  }
-
-  function toggleGuides() {
-    state.guides = !state.guides;
-    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
-    document.getElementById('guides').style.display = state.guides ? 'block' : 'none';
-    saveSettings();
-  }
-
-  function setImageBaseSizeFromLoadedImage() {
-    if (!overlayImg.naturalWidth || !overlayImg.naturalHeight) return;
-    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let w = Math.min(vw * 0.72, 460);
-    let h = w * ratio;
-    if (h > vh * 0.72) {
-      h = vh * 0.72;
-      w = h / ratio;
-    }
-    state.baseW = w;
-    state.baseH = h;
-    state.scale = 1;
-    scaleRange.value = '1';
-    centerOverlay();
-  }
-
-  async function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      stream = null;
-    }
-  }
-
-  async function startCamera() {
-    setStatus('Starting camera...');
-    errorMsg.textContent = '';
-
-    try {
-      await stopCamera();
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('This browser does not support camera access.');
-      }
-
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: state.facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      });
-
-      camera.srcObject = stream;
-      await camera.play();
-
-      loader.style.display = 'none';
-      setStatus(state.facingMode === 'user' ? 'Front camera' : 'Rear camera');
-      updateOverlay();
-    } catch (err) {
-      console.error(err);
-      loader.style.display = 'flex';
-      errorMsg.textContent =
-        'Camera failed to start. Open this site in HTTPS on Safari and allow camera permission.';
-      setStatus('Camera error');
-    }
-  }
-
-  function buildOutlineDataUrl(src) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const maxDim = 1400;
-          const ratio = img.width / img.height;
-          let w = img.width;
-          let h = img.height;
-
-          if (w > h && w > maxDim) {
-            h = Math.round(h * (maxDim / w));
-            w = maxDim;
-          } else if (h >= w && h > maxDim) {
-            w = Math.round(w * (maxDim / h));
-            h = maxDim;
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0, w, h);
-
-          const srcData = ctx.getImageData(0, 0, w, h);
-          const d = srcData.data;
-
-          const gray = new Float32Array(w * h);
-          for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-            gray[p] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-          }
-
-          const out = ctx.createImageData(w, h);
-          const o = out.data;
-
-          const threshold = 42;
-          const scaleFactor = 5.5;
-
-          for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-              const i = y * w + x;
-
-              const tl = gray[i - w - 1];
-              const tc = gray[i - w];
-              const tr = gray[i - w + 1];
-              const ml = gray[i - 1];
-              const mr = gray[i + 1];
-              const bl = gray[i + w - 1];
-              const bc = gray[i + w];
-              const br = gray[i + w + 1];
-
-              const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
-              const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
-              const mag = Math.sqrt(gx * gx + gy * gy);
-
-              const edge = clamp((mag - threshold) * scaleFactor, 0, 255);
-              const idx = i * 4;
-
-              if (edge > 0) {
-                o[idx] = 0;
-                o[idx + 1] = 0;
-                o[idx + 2] = 0;
-                o[idx + 3] = edge;
-              } else {
-                o[idx + 3] = 0;
-              }
+
+    <!-- Loader -->
+    <div id="loader">
+        <div id="loaderBox">
+            <h1>✨ AR Trace Pro</h1>
+            <p>Point your camera at paper, load an image, and trace like a pro.<br>All premium features — <b>completely free</b>.</p>
+            <div id="errorMsg"></div>
+        </div>
+    </div>
+
+    <!-- Stage -->
+    <div id="stage">
+        <video id="camera" autoplay playsinline muted></video>
+        <div id="vignette"></div>
+        <div id="overlayWrap">
+            <img id="overlayImg" alt="overlay" />
+            <div id="gridOverlay"></div>
+            <div id="crosshairOverlay"></div>
+            <div id="lockShield"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- Timer Display -->
+    <div id="timerDisplay"></div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-chip">
+            <b>🎯 AR Trace Pro</b>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="icon-btn" id="btnLock" title="Lock overlay">🔒</button>
+            <button class="icon-btn" id="btnFlashlight" title="Flashlight">🔦</button>
+            <button class="icon-btn" id="btnFlipCam" title="Flip camera">🔄</button>
+            <button class="icon-btn" id="btnTimer" title="Timer">⏱️</button>
+        </div>
+        <div class="hud-chip dim" id="statusChip">
+            <span class="hud-dot on"></span>
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <!-- Bottom Panel -->
+    <div id="bottomPanel">
+        <!-- Row: Upload & Actions -->
+        <div class="row">
+            <label class="btn fileBtn accent">
+                📁 Upload Image
+                <input id="fileInput" type="file" accept="image/*" />
+            </label>
+            <button class="btn" id="fitBtn">📐 Fit</button>
+            <button class="btn" id="resetBtn">↩ Reset</button>
+            <button class="btn" id="btnScreenshot">📸 Snap</button>
+            <button class="btn" id="btnUndo">↶ Undo</button>
+        </div>
+
+        <!-- Row: Flip & Guides -->
+        <div class="row">
+            <button class="btn" id="btnFlipH">↔ Flip H</button>
+            <button class="btn" id="btnFlipV">↕ Flip V</button>
+            <div class="divider"></div>
+            <button class="btn" id="btnGrid">📏 Grid</button>
+            <button class="btn" id="btnCrosshair">➕ Cross</button>
+            <button class="btn" id="btnEdge">✏️ Edge Mode</button>
+        </div>
+
+        <!-- Row: Opacity slider + presets -->
+        <div class="row">
+            <div class="sliderWrap">
+                <span class="lbl">Opacity</span>
+                <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.55" />
+            </div>
+            <div class="preset-row">
+                <span class="preset-chip" data-op="0.25">25%</span>
+                <span class="preset-chip" data-op="0.50">50%</span>
+                <span class="preset-chip on" data-op="0.55">55%</span>
+                <span class="preset-chip" data-op="0.75">75%</span>
+                <span class="preset-chip" data-op="1.0">100%</span>
+            </div>
+        </div>
+
+        <!-- Row: Size slider -->
+        <div class="row">
+            <div class="sliderWrap">
+                <span class="lbl">Size</span>
+                <input id="sizeRange" type="range" min="80" max="1000" step="1" value="320" />
+            </div>
+            <button class="btn" id="btnSizeDown" style="padding:8px 10px;">−</button>
+            <button class="btn" id="btnSizeUp" style="padding:8px 10px;">+</button>
+        </div>
+
+        <!-- Row: Filters -->
+        <div class="row centered">
+            <span style="font-size:11px;color:var(--muted);">Filter:</span>
+            <span class="preset-chip filter-chip on" data-filter="none">Normal</span>
+            <span class="preset-chip filter-chip" data-filter="grayscale(100%)">B&W</span>
+            <span class="preset-chip filter-chip" data-filter="invert(100%)">Invert</span>
+            <span class="preset-chip filter-chip" data-filter="contrast(1.6) brightness(1.1)">High Contrast</span>
+            <span class="preset-chip filter-chip" data-filter="saturate(0.3) brightness(1.2)">Faded</span>
+        </div>
+
+        <!-- Row: Recent images -->
+        <div id="recentStrip" style="margin-top:4px;"></div>
+
+        <!-- Hint -->
+        <div class="hint">
+            🖐 Drag with one finger &nbsp;|&nbsp; 🤌 Pinch to zoom & rotate &nbsp;|&nbsp; 🖱 Scroll wheel to zoom &nbsp;|&nbsp; Double-tap to fit
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            // ──────────────────────────────────────
+            // DOM refs
+            // ──────────────────────────────────────
+            const camera = document.getElementById('camera');
+            const overlayWrap = document.getElementById('overlayWrap');
+            const overlayImg = document.getElementById('overlayImg');
+            const gridOverlay = document.getElementById('gridOverlay');
+            const crosshairOverlay = document.getElementById('crosshairOverlay');
+            const lockShield = document.getElementById('lockShield');
+            const fileInput = document.getElementById('fileInput');
+            const opacityRange = document.getElementById('opacityRange');
+            const sizeRange = document.getElementById('sizeRange');
+            const resetBtn = document.getElementById('resetBtn');
+            const fitBtn = document.getElementById('fitBtn');
+            const statusText = document.getElementById('statusText');
+            const statusChip = document.getElementById('statusChip');
+            const loader = document.getElementById('loader');
+            const errorMsg = document.getElementById('errorMsg');
+            const toast = document.getElementById('toast');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const recentStrip = document.getElementById('recentStrip');
+            const btnLock = document.getElementById('btnLock');
+            const btnFlashlight = document.getElementById('btnFlashlight');
+            const btnFlipCam = document.getElementById('btnFlipCam');
+            const btnTimer = document.getElementById('btnTimer');
+            const btnScreenshot = document.getElementById('btnScreenshot');
+            const btnUndo = document.getElementById('btnUndo');
+            const btnFlipH = document.getElementById('btnFlipH');
+            const btnFlipV = document.getElementById('btnFlipV');
+            const btnGrid = document.getElementById('btnGrid');
+            const btnCrosshair = document.getElementById('btnCrosshair');
+            const btnEdge = document.getElementById('btnEdge');
+            const btnSizeDown = document.getElementById('btnSizeDown');
+            const btnSizeUp = document.getElementById('btnSizeUp');
+
+            // ──────────────────────────────────────
+            // State
+            // ──────────────────────────────────────
+            let stream = null;
+            let currentFacingMode = 'environment';
+            let flashlightOn = false;
+            let locked = false;
+            let gridOn = false;
+            let crosshairOn = false;
+            let edgeMode = false;
+            let flipH = false;
+            let flipV = false;
+            let currentFilter = 'none';
+            let originalImageSrc = null;
+            let edgeImageSrc = null;
+            let undoStack = [];
+            const MAX_UNDO = 30;
+            let recentImages = []; // { dataURL, name }
+            const MAX_RECENT = 8;
+
+            let state = {
+                x: 0,
+                y: 0,
+                scale: 1,
+                rotation: 0,
+                baseW: 320,
+                baseH: 320,
+                opacity: 0.55,
+            };
+
+            // Timer
+            let timerInterval = null;
+            let timerSeconds = 0;
+            let timerRunning = false;
+            let timerPreset = 300; // default 5 min
+
+            const pointers = new Map();
+            let dragStart = null;
+            let pinchStart = null;
+            let lastTapTime = 0;
+            let lastTapPos = { x: 0, y: 0 };
+
+            // ──────────────────────────────────────
+            // Helpers
+            // ──────────────────────────────────────
+            function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+            function haptic(ms = 10) { try { navigator.vibrate?.(ms); } catch (e) { /* */ } }
+
+            function showToast(msg, duration = 1200) {
+                toast.textContent = msg;
+                toast.classList.add('show');
+                clearTimeout(toast._t);
+                toast._t = setTimeout(() => toast.classList.remove('show'), duration);
             }
-          }
 
-          ctx.putImageData(out, 0, 0);
-          resolve(canvas.toDataURL('image/png'));
-        } catch (e) {
-          reject(e);
-        }
-      };
-      img.onerror = reject;
-      img.src = src;
-    });
-  }
+            function setStatus(text, dotType = 'on') {
+                statusText.textContent = text;
+                const dot = statusChip.querySelector('.hud-dot');
+                dot.className = 'hud-dot ' + dotType;
+            }
 
-  async function loadImageFile(file) {
-    if (!file) return;
+            function pushUndo() {
+                undoStack.push({
+                    x: state.x,
+                    y: state.y,
+                    scale: state.scale,
+                    rotation: state.rotation,
+                    baseW: state.baseW,
+                    baseH: state.baseH,
+                    opacity: state.opacity,
+                });
+                if (undoStack.length > MAX_UNDO) undoStack.shift();
+            }
 
-    const src = URL.createObjectURL(file);
-    state.originalSrc = src;
-    state.outlineSrc = '';
-    state.mode = 'normal';
-    overlayImg.src = src;
-    setStatus('Image loaded');
-    setMode('Normal');
+            function applyTransform() {
+                const rot = state.rotation;
+                overlayWrap.style.transform =
+                    `translate(${state.x}px, ${state.y}px) rotate(${rot}deg) scale(${state.scale})`;
+                overlayWrap.style.opacity = String(state.opacity);
+                overlayImg.style.width = `${state.baseW}px`;
+                // Apply flip to image itself
+                const sx = flipH ? -1 : 1;
+                const sy = flipV ? -1 : 1;
+                overlayImg.style.transform = `scaleX(${sx}) scaleY(${sy})`;
+                // Apply CSS filter
+                overlayImg.style.filter = edgeMode ? 'none' : currentFilter;
+                // Grid & crosshair
+                gridOverlay.style.display = gridOn ? 'block' : 'none';
+                crosshairOverlay.style.display = crosshairOn ? 'block' : 'none';
+                lockShield.style.display = locked ? 'block' : 'none';
+                // Update sliders
+                opacityRange.value = String(state.opacity);
+                sizeRange.value = String(Math.round(state.baseW));
+                // Update preset chips
+                document.querySelectorAll('.preset-chip[data-op]').forEach(ch => {
+                    ch.classList.toggle('on', Math.abs(parseFloat(ch.dataset.op) - state.opacity) < 0.005);
+                });
+                document.querySelectorAll('.filter-chip').forEach(ch => {
+                    ch.classList.toggle('on', ch.dataset.filter === currentFilter && !edgeMode);
+                });
+            }
 
-    overlayImg.onload = () => {
-      setImageBaseSizeFromLoadedImage();
-      updateOverlay();
-    };
+            function centerOverlay() {
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                state.x = (vw - state.baseW * state.scale) / 2;
+                state.y = (vh - state.baseH * state.scale) / 2;
+                applyTransform();
+            }
 
-    try {
-      setStatus('Building outline...');
-      const outline = await buildOutlineDataUrl(src);
-      state.outlineSrc = outline;
-      if (state.mode === 'outline') {
-        overlayImg.src = outline;
-      }
-      setStatus('Image ready');
-      updateOverlay();
-    } catch (e) {
-      console.error(e);
-      setStatus('Outline unavailable');
-    }
-  }
+            function fitOverlayToScreen() {
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                const target = Math.min(vw * 0.7, vh * 0.7);
+                state.baseW = target;
+                if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+                    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                    state.baseH = target * ratio;
+                } else {
+                    state.baseH = target;
+                }
+                state.scale = 1;
+                state.rotation = 0;
+                sizeRange.value = String(Math.round(state.baseW));
+                centerOverlay();
+                applyTransform();
+                pushUndo();
+                setStatus('Fitted to screen');
+                haptic();
+            }
 
-  function getDistance(a, b) {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
+            function updateBaseH() {
+                if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+                    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                    state.baseH = state.baseW * ratio;
+                } else {
+                    state.baseH = state.baseW;
+                }
+            }
 
-  function getAngle(a, b) {
-    return Math.atan2(b.y - a.y, b.x - a.x);
-  }
+            // ──────────────────────────────────────
+            // Edge detection (canvas-based)
+            // ──────────────────────────────────────
+            function generateEdgeImage() {
+                if (!originalImageSrc) return;
+                const img = new Image();
+                img.onload = () => {
+                    const maxDim = 600;
+                    let w = img.naturalWidth;
+                    let h = img.naturalHeight;
+                    if (Math.max(w, h) > maxDim) {
+                        const ratio = Math.min(maxDim / w, maxDim / h);
+                        w = Math.round(w * ratio);
+                        h = Math.round(h * ratio);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const imageData = ctx.getImageData(0, 0, w, h);
+                    const data = imageData.data;
+                    const gray = new Float32Array(w * h);
+                    for (let i = 0; i < data.length; i += 4) {
+                        const idx = i / 4;
+                        gray[idx] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    }
+                    // Sobel-like edge detection
+                    const edge = new Float32Array(w * h);
+                    let maxEdge = 0;
+                    for (let y = 1; y < h - 1; y++) {
+                        for (let x = 1; x < w - 1; x++) {
+                            const idx = y * w + x;
+                            const gx = -gray[idx - w - 1] + gray[idx - w + 1] - 2 * gray[idx - 1] + 2 * gray[idx + 1] -
+                                gray[idx + w - 1] + gray[idx + w + 1];
+                            const gy = -gray[idx - w - 1] - 2 * gray[idx - w] - gray[idx - w + 1] + gray[idx + w - 1] +
+                                2 * gray[idx + w] + gray[idx + w + 1];
+                            const mag = Math.sqrt(gx * gx + gy * gy);
+                            edge[idx] = mag;
+                            if (mag > maxEdge) maxEdge = mag;
+                        }
+                    }
+                    // Normalize and threshold
+                    const threshold = maxEdge * 0.15;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const idx = i / 4;
+                        const val = edge[idx] > threshold ? 255 - (edge[idx] / maxEdge) * 255 : 255;
+                        data[i] = val;
+                        data[i + 1] = val;
+                        data[i + 2] = val;
+                        data[i + 3] = 255;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    edgeImageSrc = canvas.toDataURL('image/png');
+                    overlayImg.src = edgeImageSrc;
+                    setStatus('Edge mode ON', 'warn');
+                    showToast('✏️ Edge detection applied');
+                };
+                img.src = originalImageSrc;
+            }
 
-  function getCenter(a, b) {
-    return {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2
-    };
-  }
+            function toggleEdgeMode() {
+                edgeMode = !edgeMode;
+                if (edgeMode) {
+                    if (!edgeImageSrc && originalImageSrc) generateEdgeImage();
+                    else if (edgeImageSrc) {
+                        overlayImg.src = edgeImageSrc;
+                        setStatus('Edge mode ON', 'warn');
+                    }
+                    btnEdge.classList.add('active');
+                } else {
+                    overlayImg.src = originalImageSrc || overlayImg.src;
+                    overlayImg.style.filter = currentFilter;
+                    setStatus('Normal mode', 'on');
+                    btnEdge.classList.remove('active');
+                }
+                applyTransform();
+                haptic();
+            }
 
-  function startDrag(pointer) {
-    drag = {
-      id: pointer.id,
-      startX: pointer.x,
-      startY: pointer.y,
-      originCx: state.cx,
-      originCy: state.cy
-    };
-    setStatus('Dragging');
-  }
+            // ──────────────────────────────────────
+            // Camera
+            // ──────────────────────────────────────
+            async function startCamera(facingMode = 'environment') {
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('Camera API not supported in this browser.');
+                    }
+                    if (stream) {
+                        stream.getTracks().forEach(t => t.stop());
+                    }
+                    const constraints = {
+                        video: {
+                            facingMode: { ideal: facingMode },
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: false,
+                    };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    camera.srcObject = stream;
+                    await camera.play();
+                    currentFacingMode = facingMode;
+                    flashlightOn = false;
+                    btnFlashlight.classList.remove('active');
+                    loader.classList.add('fadeout');
+                    setTimeout(() => { loader.style.display = 'none'; }, 500);
+                    setStatus('Camera active', 'on');
+                } catch (err) {
+                    loader.style.display = 'flex';
+                    loader.classList.remove('fadeout');
+                    errorMsg.textContent =
+                        '⚠ Could not access camera. Ensure you\'re using HTTPS and have granted camera permission.';
+                    setStatus('Camera error', 'off');
+                    console.error(err);
+                }
+            }
 
-  function startGesture(p1, p2) {
-    gesture = {
-      id1: p1.id,
-      id2: p2.id,
-      startDist: getDistance(p1, p2),
-      startAngle: getAngle(p1, p2),
-      startScale: state.scale,
-      startRotation: state.rotation,
-      startCx: state.cx,
-      startCy: state.cy,
-      startCenter: getCenter(p1, p2)
-    };
-    drag = null;
-    setStatus('Pinch / rotate');
-  }
+            async function toggleFlashlight() {
+                if (currentFacingMode !== 'environment') {
+                    showToast('Flashlight only works with rear camera');
+                    return;
+                }
+                try {
+                    const track = stream?.getVideoTracks()?.[0];
+                    if (!track) return;
+                    const capabilities = track.getCapabilities?.();
+                    if (!capabilities?.torch) {
+                        showToast('Flashlight not supported on this device');
+                        return;
+                    }
+                    flashlightOn = !flashlightOn;
+                    await track.applyConstraints({ advanced: [{ torch: flashlightOn }] });
+                    btnFlashlight.classList.toggle('active', flashlightOn);
+                    showToast(flashlightOn ? '🔦 Flashlight ON' : 'Flashlight OFF');
+                    haptic();
+                } catch (e) {
+                    showToast('Flashlight toggle failed');
+                    console.error(e);
+                }
+            }
 
-  function updateDrag(pointer) {
-    if (!drag) return;
-    const dx = pointer.x - drag.startX;
-    const dy = pointer.y - drag.startY;
-    state.cx = drag.originCx + dx;
-    state.cy = drag.originCy + dy;
-    updateOverlay();
-  }
+            async function flipCamera() {
+                const newMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+                await startCamera(newMode);
+                btnFlipCam.style.transform = 'rotate(180deg)';
+                setTimeout(() => { btnFlipCam.style.transform = 'rotate(0deg)'; }, 300);
+                showToast(newMode === 'user' ? '📱 Front camera' : '📷 Rear camera');
+                haptic();
+            }
 
-  function updateGesture(p1, p2) {
-    if (!gesture) return;
+            // ──────────────────────────────────────
+            // Timer
+            // ──────────────────────────────────────
+            function updateTimerDisplay() {
+                const mins = Math.floor(timerSeconds / 60);
+                const secs = timerSeconds % 60;
+                timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                if (timerRunning && timerSeconds <= 30 && timerSeconds > 0) {
+                    timerDisplay.classList.add('urgent');
+                } else {
+                    timerDisplay.classList.remove('urgent');
+                }
+            }
 
-    const dist = getDistance(p1, p2);
-    const angle = getAngle(p1, p2);
-    const center = getCenter(p1, p2);
+            function startTimer() {
+                if (timerRunning) return;
+                if (timerSeconds <= 0) timerSeconds = timerPreset;
+                timerRunning = true;
+                timerDisplay.style.display = 'block';
+                updateTimerDisplay();
+                btnTimer.classList.add('active');
+                timerInterval = setInterval(() => {
+                    if (timerSeconds > 0) {
+                        timerSeconds--;
+                        updateTimerDisplay();
+                    }
+                    if (timerSeconds <= 0) {
+                        stopTimer();
+                        showToast('⏰ Time\'s up!');
+                        haptic(200);
+                    }
+                }, 1000);
+                setStatus('Timer running', 'warn');
+                haptic();
+            }
 
-    state.scale = clamp(gesture.startScale * (dist / gesture.startDist), 0.15, 8);
-    state.rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180 / Math.PI);
+            function stopTimer() {
+                timerRunning = false;
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timerDisplay.style.display = 'none';
+                timerDisplay.classList.remove('urgent');
+                btnTimer.classList.remove('active');
+                setStatus('Ready', 'on');
+            }
 
-    state.cx = gesture.startCx + (center.x - gesture.startCenter.x);
-    state.cy = gesture.startCy + (center.y - gesture.startCenter.y);
+            function resetTimer() {
+                stopTimer();
+                timerSeconds = timerPreset;
+                updateTimerDisplay();
+                timerDisplay.style.display = 'block';
+                setTimeout(() => { timerDisplay.style.display = 'none'; }, 1500);
+                showToast(`Timer reset to ${Math.floor(timerPreset/60)}:${String(timerPreset%60).padStart(2,'0')}`);
+            }
 
-    scaleRange.value = String(state.scale);
-    updateOverlay();
-  }
+            function cycleTimerPreset() {
+                const presets = [60, 180, 300, 600, 900]; // 1,3,5,10,15 min
+                const current = presets.indexOf(timerPreset);
+                const next = (current + 1) % presets.length;
+                timerPreset = presets[next];
+                if (!timerRunning) timerSeconds = timerPreset;
+                const mins = Math.floor(timerPreset / 60);
+                const label = mins >= 1 ? `${mins} min` : `${timerPreset} sec`;
+                showToast(`Timer preset: ${label}`);
+                updateTimerDisplay();
+                if (!timerRunning) {
+                    timerDisplay.style.display = 'block';
+                    updateTimerDisplay();
+                    setTimeout(() => { if (!timerRunning) timerDisplay.style.display = 'none'; }, 1500);
+                }
+            }
 
-  function endPointer(pointerId) {
-    pointers.delete(pointerId);
+            btnTimer.addEventListener('click', () => {
+                if (timerRunning) {
+                    stopTimer();
+                } else if (timerSeconds > 0 && timerSeconds !== timerPreset) {
+                    // If timer was paused/reset, restart
+                    startTimer();
+                } else {
+                    cycleTimerPreset();
+                    // Double-click to start
+                    if (btnTimer._lastClick && Date.now() - btnTimer._lastClick < 400) {
+                        startTimer();
+                    }
+                    btnTimer._lastClick = Date.now();
+                }
+            });
 
-    if (state.locked) return;
+            // ──────────────────────────────────────
+            // Screenshot
+            // ──────────────────────────────────────
+            function takeScreenshot() {
+                const canvas = document.createElement('canvas');
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                canvas.width = vw;
+                canvas.height = vh;
+                const ctx = canvas.getContext('2d');
+                // Draw camera frame
+                ctx.drawImage(camera, 0, 0, vw, vh);
+                // Draw overlay
+                const wrapRect = overlayWrap.getBoundingClientRect();
+                const imgRect = overlayImg.getBoundingClientRect();
+                if (overlayImg.src && overlayImg.naturalWidth) {
+                    ctx.save();
+                    ctx.globalAlpha = state.opacity;
+                    ctx.translate(wrapRect.left + wrapRect.width / 2, wrapRect.top + wrapRect.height / 2);
+                    ctx.rotate((state.rotation * Math.PI) / 180);
+                    const sx = flipH ? -1 : 1;
+                    const sy = flipV ? -1 : 1;
+                    ctx.scale(sx, sy);
+                    ctx.drawImage(overlayImg, -imgRect.width / 2, -imgRect.height / 2, imgRect.width, imgRect.height);
+                    ctx.restore();
+                }
+                const link = document.createElement('a');
+                link.download = 'trace-snap-' + Date.now() + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('📸 Screenshot saved!');
+                haptic(20);
+            }
 
-    if (pointers.size === 0) {
-      drag = null;
-      gesture = null;
-      setStatus(state.mode === 'outline' ? 'Outline' : 'Ready');
-      return;
-    }
+            // ──────────────────────────────────────
+            // Undo
+            // ──────────────────────────────────────
+            function undo() {
+                if (undoStack.length === 0) {
+                    showToast('Nothing to undo');
+                    return;
+                }
+                const prev = undoStack.pop();
+                state.x = prev.x;
+                state.y = prev.y;
+                state.scale = prev.scale;
+                state.rotation = prev.rotation;
+                state.baseW = prev.baseW;
+                state.baseH = prev.baseH;
+                state.opacity = prev.opacity;
+                sizeRange.value = String(Math.round(state.baseW));
+                opacityRange.value = String(state.opacity);
+                applyTransform();
+                setStatus('Undo');
+                haptic();
+            }
 
-    if (pointers.size === 1) {
-      const p = Array.from(pointers.values())[0];
-      startDrag(p);
-      gesture = null;
-      return;
-    }
+            // ──────────────────────────────────────
+            // Recent images
+            // ──────────────────────────────────────
+            function loadRecentImages() {
+                try {
+                    const stored = localStorage.getItem('artrace_recent');
+                    if (stored) recentImages = JSON.parse(stored);
+                } catch (e) { recentImages = []; }
+                renderRecentStrip();
+            }
 
-    if (pointers.size >= 2) {
-      const pts = Array.from(pointers.values()).slice(0, 2);
-      startGesture(pts[0], pts[1]);
-    }
-  }
+            function saveRecentImages() {
+                try {
+                    localStorage.setItem('artrace_recent', JSON.stringify(recentImages.slice(0, MAX_RECENT)));
+                } catch (e) { /* quota exceeded, silently fail */ }
+            }
 
-  overlayWrap.addEventListener('pointerdown', e => {
-    if (state.locked) return;
-    e.preventDefault();
+            function addRecentImage(dataURL, name) {
+                // Remove duplicates
+                recentImages = recentImages.filter(r => r.dataURL !== dataURL);
+                recentImages.unshift({ dataURL, name: name || 'Image', timestamp: Date.now() });
+                if (recentImages.length > MAX_RECENT) recentImages = recentImages.slice(0, MAX_RECENT);
+                saveRecentImages();
+                renderRecentStrip();
+            }
 
-    overlayWrap.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+            function renderRecentStrip() {
+                recentStrip.innerHTML = '';
+                if (recentImages.length === 0) {
+                    recentStrip.innerHTML =
+                        '<span style="font-size:10px;color:var(--muted);padding:6px;">Recent images appear here</span>';
+                    return;
+                }
+                recentImages.forEach((rimg, i) => {
+                    const thumb = document.createElement('img');
+                    thumb.src = rimg.dataURL;
+                    thumb.className = 'recent-thumb';
+                    thumb.title = rimg.name || `Image ${i+1}`;
+                    thumb.addEventListener('click', () => {
+                        loadImageFromDataURL(rimg.dataURL, rimg.name);
+                        haptic();
+                    });
+                    recentStrip.appendChild(thumb);
+                });
+            }
 
-    const pts = Array.from(pointers.values());
-    if (pts.length === 1) {
-      startDrag(pts[0]);
-    } else if (pts.length >= 2) {
-      startGesture(pts[0], pts[1]);
-    }
-  });
+            function loadImageFromDataURL(dataURL, name) {
+                overlayImg.onload = () => {
+                    if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+                        const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                        state.baseW = Math.min(window.innerWidth * 0.7, 420);
+                        state.baseH = state.baseW * ratio;
+                        state.scale = 1;
+                        state.rotation = 0;
+                        sizeRange.value = String(Math.round(state.baseW));
+                        centerOverlay();
+                        applyTransform();
+                        pushUndo();
+                        setStatus(`Loaded: ${name || 'Image'}`);
+                    }
+                };
+                overlayImg.src = dataURL;
+                originalImageSrc = dataURL;
+                edgeImageSrc = null;
+                if (edgeMode) {
+                    edgeMode = false;
+                    btnEdge.classList.remove('active');
+                    overlayImg.style.filter = currentFilter;
+                }
+            }
 
-  overlayWrap.addEventListener('pointermove', e => {
-    if (state.locked) return;
-    if (!pointers.has(e.pointerId)) return;
+            function handleFileLoad(file) {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const dataURL = e.target.result;
+                    originalImageSrc = dataURL;
+                    edgeImageSrc = null;
+                    if (edgeMode) {
+                        edgeMode = false;
+                        btnEdge.classList.remove('active');
+                        overlayImg.style.filter = currentFilter;
+                    }
+                    overlayImg.onload = () => {
+                        if (overlayImg.naturalWidth && overlayImg.naturalHeight) {
+                            const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                            state.baseW = Math.min(window.innerWidth * 0.7, 420);
+                            state.baseH = state.baseW * ratio;
+                            state.scale = 1;
+                            state.rotation = 0;
+                            sizeRange.value = String(Math.round(state.baseW));
+                            centerOverlay();
+                            applyTransform();
+                            pushUndo();
+                            setStatus('Image loaded');
+                            addRecentImage(dataURL, file.name);
+                        }
+                    };
+                    overlayImg.src = dataURL;
+                };
+                reader.readAsDataURL(file);
+            }
 
-    e.preventDefault();
-    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+            // ──────────────────────────────────────
+            // Event listeners
+            // ──────────────────────────────────────
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                handleFileLoad(file);
+            });
 
-    const pts = Array.from(pointers.values());
-    if (pts.length === 1 && drag) {
-      updateDrag(pts[0]);
-    } else if (pts.length >= 2 && gesture) {
-      updateGesture(pts[0], pts[1]);
-    }
-  });
+            opacityRange.addEventListener('input', (e) => {
+                state.opacity = parseFloat(e.target.value);
+                applyTransform();
+            });
 
-  overlayWrap.addEventListener('pointerup', e => {
-    if (pointers.has(e.pointerId)) {
-      endPointer(e.pointerId);
-    }
-  });
+            sizeRange.addEventListener('input', (e) => {
+                state.baseW = parseInt(e.target.value, 10);
+                updateBaseH();
+                applyTransform();
+            });
 
-  overlayWrap.addEventListener('pointercancel', e => {
-    if (pointers.has(e.pointerId)) {
-      endPointer(e.pointerId);
-    }
-  });
+            btnSizeDown.addEventListener('click', () => {
+                state.baseW = Math.max(80, state.baseW - 20);
+                updateBaseH();
+                sizeRange.value = String(Math.round(state.baseW));
+                applyTransform();
+                haptic(5);
+            });
+            btnSizeUp.addEventListener('click', () => {
+                state.baseW = Math.min(1000, state.baseW + 20);
+                updateBaseH();
+                sizeRange.value = String(Math.round(state.baseW));
+                applyTransform();
+                haptic(5);
+            });
 
-  overlayWrap.addEventListener('pointerleave', e => {
-    if (pointers.has(e.pointerId)) {
-      endPointer(e.pointerId);
-    }
-  });
+            resetBtn.addEventListener('click', () => {
+                state.scale = 1;
+                state.rotation = 0;
+                flipH = false;
+                flipV = false;
+                btnFlipH.classList.remove('active');
+                btnFlipV.classList.remove('active');
+                sizeRange.value = String(Math.round(state.baseW));
+                centerOverlay();
+                applyTransform();
+                pushUndo();
+                setStatus('Reset');
+                haptic();
+                showToast('↩ Overlay reset');
+            });
 
-  fileInput.addEventListener('change', e => {
-    const file = e.target.files && e.target.files[0];
-    if (file) loadImageFile(file);
-  });
+            fitBtn.addEventListener('click', () => {
+                if (!overlayImg.src) return;
+                fitOverlayToScreen();
+                showToast('📐 Fitted to screen');
+            });
 
-  opacityRange.addEventListener('input', e => {
-    state.opacity = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            btnLock.addEventListener('click', () => {
+                locked = !locked;
+                btnLock.classList.toggle('active', locked);
+                overlayWrap.style.pointerEvents = locked ? 'none' : 'auto';
+                lockShield.style.display = locked ? 'block' : 'none';
+                setStatus(locked ? 'Locked' : 'Unlocked', locked ? 'off' : 'on');
+                showToast(locked ? '🔒 Overlay locked' : '🔓 Overlay unlocked');
+                haptic();
+            });
 
-  scaleRange.addEventListener('input', e => {
-    state.scale = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            btnFlashlight.addEventListener('click', toggleFlashlight);
+            btnFlipCam.addEventListener('click', flipCamera);
+            btnScreenshot.addEventListener('click', takeScreenshot);
+            btnUndo.addEventListener('click', undo);
 
-  brightnessRange.addEventListener('input', e => {
-    state.brightness = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            btnFlipH.addEventListener('click', () => {
+                flipH = !flipH;
+                btnFlipH.classList.toggle('active', flipH);
+                applyTransform();
+                haptic();
+                showToast(flipH ? '↔ Flipped horizontally' : '↔ Horizontal flip off');
+            });
+            btnFlipV.addEventListener('click', () => {
+                flipV = !flipV;
+                btnFlipV.classList.toggle('active', flipV);
+                applyTransform();
+                haptic();
+                showToast(flipV ? '↕ Flipped vertically' : '↕ Vertical flip off');
+            });
+            btnGrid.addEventListener('click', () => {
+                gridOn = !gridOn;
+                btnGrid.classList.toggle('active', gridOn);
+                gridOverlay.style.display = gridOn ? 'block' : 'none';
+                haptic();
+                showToast(gridOn ? '📏 Grid ON' : 'Grid OFF');
+            });
+            btnCrosshair.addEventListener('click', () => {
+                crosshairOn = !crosshairOn;
+                btnCrosshair.classList.toggle('active', crosshairOn);
+                crosshairOverlay.style.display = crosshairOn ? 'block' : 'none';
+                haptic();
+                showToast(crosshairOn ? '➕ Crosshair ON' : 'Crosshair OFF');
+            });
+            btnEdge.addEventListener('click', toggleEdgeMode);
 
-  contrastRange.addEventListener('input', e => {
-    state.contrast = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            // Opacity presets
+            document.querySelectorAll('.preset-chip[data-op]').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    state.opacity = parseFloat(chip.dataset.op);
+                    opacityRange.value = String(state.opacity);
+                    applyTransform();
+                    haptic(5);
+                });
+            });
 
-  saturationRange.addEventListener('input', e => {
-    state.saturation = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            // Filter chips
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    if (edgeMode) {
+                        edgeMode = false;
+                        btnEdge.classList.remove('active');
+                        overlayImg.src = originalImageSrc || overlayImg.src;
+                    }
+                    currentFilter = chip.dataset.filter;
+                    overlayImg.style.filter = currentFilter;
+                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle(
+                        'on', c === chip));
+                    haptic(5);
+                    showToast('🎨 Filter: ' + chip.textContent.trim());
+                });
+            });
 
-  blurRange.addEventListener('input', e => {
-    state.blur = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            // ──────────────────────────────────────
+            // Pointer / Touch / Mouse handlers
+            // ──────────────────────────────────────
+            function getDistance(t1, t2) {
+                const dx = t2.clientX - t1.clientX;
+                const dy = t2.clientY - t1.clientY;
+                return Math.hypot(dx, dy);
+            }
 
-  fitBtn.addEventListener('click', () => {
-    if (!overlayImg.src) return;
-    fitOverlay();
-  });
+            function getAngle(t1, t2) {
+                return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * (180 / Math.PI);
+            }
 
-  resetBtn.addEventListener('click', () => {
-    if (!overlayImg.src) return;
-    resetTransform();
-  });
+            function getCenter(t1, t2) {
+                return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+            }
 
-  lockBtn.addEventListener('click', () => {
-    setLock(!state.locked);
-    updateOverlay();
-  });
+            overlayWrap.addEventListener('pointerdown', (e) => {
+                if (locked) return;
+                e.preventDefault();
+                overlayWrap.setPointerCapture(e.pointerId);
+                pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  uiBtn.addEventListener('click', toggleUI);
-  showUiBtn.addEventListener('click', toggleUI);
+                if (pointers.size === 1) {
+                    dragStart = {
+                        pointerId: e.pointerId,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        originX: state.x,
+                        originY: state.y,
+                    };
+                    setStatus('Dragging');
+                }
 
-  fullBtn.addEventListener('click', async () => {
-    try {
-      const el = document.documentElement;
-      if (!document.fullscreenElement && el.requestFullscreen) {
-        await el.requestFullscreen();
-        setStatus('Fullscreen on');
-      } else if (document.exitFullscreen) {
-        await document.exitFullscreen();
-        setStatus('Fullscreen off');
-      }
-    } catch (_) {
-      setStatus('Fullscreen unavailable');
-    }
-  });
+                if (pointers.size === 2) {
+                    const pts = Array.from(pointers.values());
+                    const ids = Array.from(pointers.keys());
+                    pinchStart = {
+                        id1: ids[0],
+                        id2: ids[1],
+                        startDist: getDistance(pts[0], pts[1]),
+                        startAngle: getAngle(pts[0], pts[1]),
+                        startScale: state.scale,
+                        startRotation: state.rotation,
+                        startX: state.x,
+                        startY: state.y,
+                        center: getCenter(pts[0], pts[1]),
+                    };
+                    dragStart = null;
+                    setStatus('Pinch zoom/rotate');
+                }
+            });
 
-  normalBtn.addEventListener('click', () => {
-    state.mode = 'normal';
-    applyImageMode();
-    setStatus('Normal mode');
-  });
+            overlayWrap.addEventListener('pointermove', (e) => {
+                if (locked) return;
+                if (!pointers.has(e.pointerId)) return;
+                e.preventDefault();
+                pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  outlineBtn.addEventListener('click', () => {
-    state.mode = 'outline';
-    applyImageMode();
-    setStatus('Outline mode');
-  });
+                if (pointers.size === 1 && dragStart) {
+                    const dx = e.clientX - dragStart.startX;
+                    const dy = e.clientY - dragStart.startY;
+                    state.x = dragStart.originX + dx;
+                    state.y = dragStart.originY + dy;
+                    applyTransform();
+                }
 
-  mirrorBtn.addEventListener('click', () => {
-    toggleMirror();
-  });
+                if (pointers.size === 2 && pinchStart) {
+                    const pts = Array.from(pointers.values());
+                    const dist = getDistance(pts[0], pts[1]);
+                    const angle = getAngle(pts[0], pts[1]);
+                    const rawScale = pinchStart.startScale * (dist / pinchStart.startDist);
+                    state.scale = clamp(rawScale, 0.15, 8);
 
-  rotateLeftBtn.addEventListener('click', () => {
-    rotateBy(-90);
-  });
+                    let angleDiff = angle - pinchStart.startAngle;
+                    // Normalize angle diff
+                    if (angleDiff > 180) angleDiff -= 360;
+                    if (angleDiff < -180) angleDiff += 360;
+                    state.rotation = pinchStart.startRotation + angleDiff;
 
-  rotateRightBtn.addEventListener('click', () => {
-    rotateBy(90);
-  });
+                    const currentCenter = getCenter(pts[0], pts[1]);
+                    const shiftX = currentCenter.x - pinchStart.center.x;
+                    const shiftY = currentCenter.y - pinchStart.center.y;
+                    state.x = pinchStart.startX + shiftX;
+                    state.y = pinchStart.startY + shiftY;
 
-  cameraBtn.addEventListener('click', async () => {
-    state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
-    saveSettings();
-    await startCamera();
-  });
+                    applyTransform();
+                }
+            });
 
-  guidesBtn.addEventListener('click', () => {
-    toggleGuides();
-  });
+            function endPointer(e) {
+                if (pointers.has(e.pointerId)) {
+                    // Double-tap detection
+                    const pt = pointers.get(e.pointerId);
+                    const now = Date.now();
+                    const dist = Math.hypot(e.clientX - lastTapPos.x, e.clientY - lastTapPos.y);
+                    if (now - lastTapTime < 300 && dist < 25 && pointers.size === 1 && !dragStart && !pinchStart) {
+                        // Double tap detected
+                        if (overlayImg.src) fitOverlayToScreen();
+                        showToast('👆 Double-tap: fit');
+                    }
+                    lastTapTime = now;
+                    lastTapPos = { x: e.clientX, y: e.clientY };
+                    pointers.delete(e.pointerId);
+                }
 
-  window.addEventListener('resize', () => {
-    if (overlayImg.src) {
-      state.cx = window.innerWidth / 2;
-      state.cy = window.innerHeight / 2;
-      updateOverlay();
-    }
-  });
+                if (pointers.size === 0) {
+                    if (dragStart || pinchStart) pushUndo();
+                    dragStart = null;
+                    pinchStart = null;
+                    setStatus('Ready');
+                } else if (pointers.size === 1 && pinchStart) {
+                    // Transitioned from pinch to drag
+                    const remaining = Array.from(pointers.entries())[0];
+                    dragStart = {
+                        pointerId: remaining[0],
+                        startX: remaining[1].x,
+                        startY: remaining[1].y,
+                        originX: state.x,
+                        originY: state.y,
+                    };
+                    pinchStart = null;
+                    setStatus('Dragging');
+                }
+            }
 
-  window.addEventListener('beforeunload', () => {
-    stopCamera();
-  });
+            overlayWrap.addEventListener('pointerup', endPointer);
+            overlayWrap.addEventListener('pointercancel', endPointer);
+            overlayWrap.addEventListener('pointerleave', endPointer);
 
-  overlayImg.addEventListener('load', () => {
-    if (!state.baseW || !state.baseH) {
-      setImageBaseSizeFromLoadedImage();
-    }
-    updateOverlay();
-  });
+            // Mouse wheel zoom
+            overlayWrap.addEventListener('wheel', (e) => {
+                if (locked) return;
+                e.preventDefault();
+                const zoomFactor = 0.08;
+                const delta = e.deltaY > 0 ? -zoomFactor : zoomFactor;
+                const newScale = clamp(state.scale + delta, 0.15, 8);
+                // Zoom toward cursor
+                const rect = overlayWrap.getBoundingClientRect();
+                const cx = e.clientX - rect.left - rect.width / 2;
+                const cy = e.clientY - rect.top - rect.height / 2;
+                const scaleRatio = newScale / state.scale;
+                state.x -= cx * (scaleRatio - 1);
+                state.y -= cy * (scaleRatio - 1);
+                state.scale = newScale;
+                applyTransform();
+                pushUndo();
+            }, { passive: false });
 
-  function restoreFromSavedSettings() {
-    loadSettings();
+            // Keyboard shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                const key = e.key.toLowerCase();
+                const nudge = 10;
+                const bigNudge = 50;
+                switch (key) {
+                    case 'arrowleft':
+                        state.x -= e.shiftKey ? bigNudge : nudge;
+                        applyTransform();
+                        break;
+                    case 'arrowright':
+                        state.x += e.shiftKey ? bigNudge : nudge;
+                        applyTransform();
+                        break;
+                    case 'arrowup':
+                        state.y -= e.shiftKey ? bigNudge : nudge;
+                        applyTransform();
+                        break;
+                    case 'arrowdown':
+                        state.y += e.shiftKey ? bigNudge : nudge;
+                        applyTransform();
+                        break;
+                    case '+':
+                    case '=':
+                        state.scale = clamp(state.scale + 0.05, 0.15, 8);
+                        applyTransform();
+                        break;
+                    case '-':
+                        state.scale = clamp(state.scale - 0.05, 0.15, 8);
+                        applyTransform();
+                        break;
+                    case 'r':
+                        resetBtn.click();
+                        break;
+                    case 'f':
+                        fitBtn.click();
+                        break;
+                    case 'l':
+                        btnLock.click();
+                        break;
+                    case 'g':
+                        btnGrid.click();
+                        break;
+                    case 'h':
+                        btnFlipH.click();
+                        break;
+                    case 'v':
+                        btnFlipV.click();
+                        break;
+                    case 's':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            takeScreenshot();
+                        }
+                        break;
+                    case 'z':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            undo();
+                        }
+                        break;
+                    default:
+                        return;
+                }
+                if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', '+', '=', '-', 'r', 'f', 'l', 'g', 'h', 'v']
+                    .includes(key)) {
+                    e.preventDefault();
+                    if (!['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) pushUndo();
+                }
+            });
 
-    opacityRange.value = String(state.opacity);
-    scaleRange.value = String(state.scale);
-    brightnessRange.value = String(state.brightness);
-    contrastRange.value = String(state.contrast);
-    saturationRange.value = String(state.saturation);
-    blurRange.value = String(state.blur);
+            // Resize
+            window.addEventListener('resize', () => {
+                if (!overlayImg.src) return;
+                centerOverlay();
+            });
 
-    document.body.classList.toggle('hideUI', state.uiHidden);
-    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
-    state.guides ? document.getElementById('guides').style.display = 'block' : document.getElementById('guides').style.display = 'none';
+            // Drag & drop from desktop
+            document.addEventListener('dragover', (e) => e.preventDefault());
+            document.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer?.files?.[0];
+                if (file && file.type.startsWith('image/')) {
+                    handleFileLoad(file);
+                    showToast('📥 Image dropped!');
+                }
+            });
 
-    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
-    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
-    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
+            // Paste from clipboard
+            document.addEventListener('paste', (e) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const blob = item.getAsFile();
+                        handleFileLoad(blob);
+                        showToast('📋 Image pasted!');
+                        break;
+                    }
+                }
+            });
 
-    updateUIValues();
-    updateOverlay();
-  }
+            // ──────────────────────────────────────
+            // Initialization
+            // ──────────────────────────────────────
+            function init() {
+                applyTransform();
+                loadRecentImages();
+                startCamera();
+                // Initial undo state
+                pushUndo();
+            }
 
-  async function init() {
-    restoreFromSavedSettings();
+            // Handle overlay image load for size sync
+            overlayImg.addEventListener('load', () => {
+                if (overlayImg.naturalWidth && overlayImg.naturalHeight && state.baseW === 320 && state
+                    .baseH === 320) {
+                    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                    state.baseW = Math.min(window.innerWidth * 0.7, 420);
+                    state.baseH = state.baseW * ratio;
+                    sizeRange.value = String(Math.round(state.baseW));
+                    state.scale = 1;
+                    state.rotation = 0;
+                    centerOverlay();
+                    applyTransform();
+                    pushUndo();
+                }
+                updateBaseH();
+            });
 
-    if (state.originalSrc) {
-      overlayImg.src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state.originalSrc;
-    }
+            init();
 
-    await startCamera();
-
-    if (!state.originalSrc) {
-      loader.style.display = 'flex';
-      errorMsg.textContent = 'Load an image to begin.';
-      setStatus('Ready');
-    } else {
-      loader.style.display = 'none';
-      setStatus('Ready');
-      applyImageMode();
-      updateOverlay();
-    }
-  }
-
-  init();
-})();
-</script>
+            console.log('%c✨ AR Trace Pro %cready',
+                'font-size:18px;font-weight:bold;color:#7ec8ff;',
+                'font-size:12px;color:#aaa;');
+            console.log('%cAll premium features unlocked — free forever.',
+                'color:#ffb74d;font-size:12px;');
+            console.log('%c⌨ Keyboard shortcuts: Arrows=nudge | +/-=zoom | R=reset | F=fit | L=lock | G=grid | H/V=flip | Ctrl+Z=undo | Ctrl+S=snap',
+                'color:#aaa;font-size:10px;');
+        })();
+    </script>
 </body>
 </html>
+```
+
+Tracing Features
+
+Here’s how this tool turns your camera into a full-featured tracing studio, with all the premium features you'd expect.
+
+· Core Tracing & Overlay Control: The camera video feed acts as your background. After uploading an image, you can drag it with one finger to reposition, pinch with two fingers to zoom and rotate, and use the scroll wheel on a desktop. The opacity and size sliders give you precise control over how the overlay blends with the paper.
+· Premium Guidance & Locking Tools: Toggle a grid and crosshair to help with proportions and alignment. The lock button fixes the overlay in place, preventing accidental movement while you trace. You can also flip the image horizontally or vertically for different reference angles.
+· Smart Image Processing: Switch to Edge Mode to automatically convert your reference image into a clean, high-contrast outline—perfect for tracing complex shapes. A set of CSS filters (grayscale, invert, high contrast) is also available to make the overlay easier to see against your paper.
+· Pro Workflow Utilities: Use the built-in timer for timed drawing exercises. Capture your progress with the screenshot button, which saves the combined camera view and overlay. The undo feature lets you revert positional changes, and your recent images are saved for quick access. Everything is designed for both touch and desktop use, with full keyboard shortcut support.
