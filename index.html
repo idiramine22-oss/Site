@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR Trace Drawing</title>
+<style>
+  body { margin:0; background:black; overflow:hidden; }
+  video, img {
+    position:absolute;
+    top:0; left:0;
+    width:100vw; height:100vh;
+    object-fit:cover;
+  }
+  #overlay {
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .controls {
+    position:fixed;
+    bottom:10px;
+    left:10px;
+    right:10px;
+    background:rgba(0,0,0,0.6);
+    padding:10px;
+    border-radius:10px;
+    color:white;
+  }
+</style>
+</head>
+<body>
+
+<video id="camera" autoplay playsinline></video>
+<img id="overlay" src="">
+
+<div class="controls">
+  <input type="file" accept="image/*" onchange="loadImage(event)">
+  <br>
+  شفافية:
+  <input type="range" min="0" max="1" step="0.01" value="0.5"
+         oninput="changeOpacity(this.value)">
+</div>
+
+<script>
+const video = document.getElementById('camera');
+
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" },
+  audio: false
+})
+.then(stream => {
+  video.srcObject = stream;
+})
+.catch(err => {
+  alert("ما قدرنا نشغل الكاميرا: " + err);
+});
+
+function loadImage(event){
+  const file = event.target.files[0];
+  const url = URL.createObjectURL(file);
+  document.getElementById('overlay').src = url;
+}
+
+function changeOpacity(val){
+  document.getElementById('overlay').style.opacity = val;
+}
+</script>
+
+</body>
+</html>
