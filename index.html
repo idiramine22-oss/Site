@@ -1,1110 +1,1670 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>AR Trace Pro</title>
-<style>
-  :root{
-    --bg:#05070a;
-    --panel:rgba(15,19,27,.84);
-    --panel2:rgba(255,255,255,.08);
-    --panel3:rgba(255,255,255,.12);
-    --text:#ffffff;
-    --muted:rgba(255,255,255,.72);
-    --border:rgba(255,255,255,.12);
-    --accent:#8bd3ff;
-    --good:#8fffbb;
-    --warn:#ffb4b4;
-  }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>AR Trace Pro</title>
+    <style>
+        :root {
+            --bg: #06080c;
+            --panel: rgba(14, 18, 26, 0.88);
+            --panel2: rgba(255, 255, 255, 0.07);
+            --panel3: rgba(255, 255, 255, 0.13);
+            --text: #f1f1f3;
+            --muted: rgba(255, 255, 255, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
+            --accent: #7ec8ff;
+            --accent2: #a78bfa;
+            --good: #7effb4;
+            --warn: #ff9e9e;
+            --draw: #ffb74d;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-  html, body{
-    margin:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#000;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    -webkit-user-select:none;
-    user-select:none;
-    touch-action:none;
-  }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-  #camera{
-    position:fixed;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    background:#000;
-  }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: var(--font);
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
 
-  #overlayWrap{
-    position:fixed;
-    left:50%;
-    top:50%;
-    transform-origin:center center;
-    will-change:transform,left,top,width,height,opacity;
-    touch-action:none;
-    z-index:10;
-    opacity:.58;
-  }
+        /* ── Camera ─────────────────────── */
+        #camera {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+            z-index: 1;
+        }
 
-  #overlayImg{
-    display:block;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    -webkit-user-drag:none;
-    user-drag:none;
-    user-select:none;
-    image-rendering:auto;
-  }
+        /* ── Overlay Image ─────────────── */
+        #overlayWrap {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform-origin: center center;
+            will-change: transform, left, top, width, height, opacity;
+            z-index: 10;
+            opacity: 0.58;
+            pointer-events: auto;
+            cursor: grab;
+        }
+        #overlayWrap:active {
+            cursor: grabbing;
+        }
+        #overlayWrap.locked {
+            pointer-events: none;
+            cursor: default;
+        }
+        #overlayImg {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            -webkit-user-drag: none;
+            user-drag: none;
+            image-rendering: auto;
+            transition: filter var(--transition);
+        }
 
-  #guides{
-    position:fixed;
-    inset:0;
-    display:none;
-    pointer-events:none;
-    z-index:8;
-  }
+        /* ── Drawing Canvas ────────────── */
+        #drawCanvas {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform-origin: center center;
+            will-change: transform, left, top, width, height;
+            z-index: 12;
+            pointer-events: none;
+            opacity: 1;
+            image-rendering: auto;
+        }
+        #drawCanvas.active {
+            pointer-events: auto;
+            cursor: crosshair;
+        }
 
-  .line{
-    position:absolute;
-    background:rgba(255,255,255,.12);
-  }
-  .v1{left:33.333%;top:0;width:1px;height:100%;}
-  .v2{left:66.666%;top:0;width:1px;height:100%;}
-  .h1{top:33.333%;left:0;height:1px;width:100%;}
-  .h2{top:66.666%;left:0;height:1px;width:100%;}
-  .centerV{left:50%;top:0;width:1px;height:100%;transform:translateX(-.5px);background:rgba(255,255,255,.18);}
-  .centerH{top:50%;left:0;height:1px;width:100%;transform:translateY(-.5px);background:rgba(255,255,255,.18);}
+        /* ── Grid Overlay ──────────────── */
+        #gridOverlay {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform-origin: center center;
+            will-change: transform, left, top, width, height;
+            z-index: 9;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition);
+            border: 1px dashed rgba(255, 255, 255, 0.18);
+            border-radius: 2px;
+        }
+        #gridOverlay.visible {
+            opacity: 1;
+        }
 
-  #topBar{
-    position:fixed;
-    left:12px;
-    right:12px;
-    top:12px;
-    z-index:30;
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-    pointer-events:none;
-  }
+        /* ── Guides ────────────────────── */
+        #guides {
+            position: fixed;
+            inset: 0;
+            z-index: 8;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition);
+        }
+        #guides.visible {
+            opacity: 1;
+        }
+        .g-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .g-v1 {
+            left: 33.333%;
+            top: 0;
+            width: 1px;
+            height: 100%;
+        }
+        .g-v2 {
+            left: 66.666%;
+            top: 0;
+            width: 1px;
+            height: 100%;
+        }
+        .g-h1 {
+            top: 33.333%;
+            left: 0;
+            height: 1px;
+            width: 100%;
+        }
+        .g-h2 {
+            top: 66.666%;
+            left: 0;
+            height: 1px;
+            width: 100%;
+        }
+        .g-cv {
+            left: 50%;
+            top: 0;
+            width: 1px;
+            height: 100%;
+            transform: translateX(-0.5px);
+            background: rgba(255, 255, 255, 0.22);
+        }
+        .g-ch {
+            top: 50%;
+            left: 0;
+            height: 1px;
+            width: 100%;
+            transform: translateY(-0.5px);
+            background: rgba(255, 255, 255, 0.22);
+        }
 
-  .chip{
-    pointer-events:auto;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:16px;
-    background:var(--panel);
-    color:var(--text);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:0 10px 30px rgba(0,0,0,.26);
-  }
+        /* ── Starter Overlay ──────────── */
+        #starter {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, rgba(18, 24, 36, 0.96), rgba(0, 0, 0, 0.98));
+            transition: opacity 0.5s ease;
+        }
+        #starter.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #starterCard {
+            width: min(400px, calc(100vw - 28px));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 26px 22px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+        #starterCard h1 {
+            margin: 0 0 6px;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        #starterCard p {
+            margin: 0 0 4px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        #starterActions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+        #errorMsg {
+            margin-top: 10px;
+            color: var(--warn);
+            font-size: 12.5px;
+            line-height: 1.5;
+            min-height: 16px;
+        }
 
-  .chip b{
-    font-size:14px;
-    font-weight:800;
-  }
+        /* ── Top Bar ──────────────────── */
+        #topBar {
+            position: fixed;
+            left: 10px;
+            right: 10px;
+            top: max(10px, env(safe-area-inset-top, 10px));
+            z-index: 30;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            pointer-events: none;
+            transition: opacity var(--transition), transform var(--transition);
+        }
+        .hideUI #topBar {
+            opacity: 0;
+            transform: translateY(-20px);
+            pointer-events: none;
+        }
+        .chip {
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 13px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--panel);
+            color: var(--text);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            font-size: 12.5px;
+            white-space: nowrap;
+        }
+        .chip b {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+        .chip .dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--good);
+            flex-shrink: 0;
+        }
+        .chip .dot.warn {
+            background: var(--warn);
+        }
 
-  .chip span{
-    font-size:12px;
-    color:var(--muted);
-  }
+        /* ── Bottom Panel ─────────────── */
+        #bottomPanel {
+            position: fixed;
+            left: 8px;
+            right: 8px;
+            bottom: max(8px, env(safe-area-inset-bottom, 8px));
+            z-index: 30;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--panel);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+            color: var(--text);
+            transition: opacity var(--transition), transform var(--transition);
+            max-height: 55vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .hideUI #bottomPanel {
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
 
-  #bottomPanel{
-    position:fixed;
-    left:12px;
-    right:12px;
-    bottom:12px;
-    z-index:30;
-    padding:12px;
-    border:1px solid var(--border);
-    border-radius:22px;
-    background:var(--panel);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    box-shadow:0 16px 40px rgba(0,0,0,.36);
-    color:var(--text);
-  }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            align-items: center;
+        }
+        .row+.row {
+            margin-top: 7px;
+        }
+        .row.centered {
+            justify-content: center;
+        }
 
-  .row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    align-items:center;
-  }
+        .btn {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            transition: all var(--transition);
+            letter-spacing: -0.1px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+        .btn.primary {
+            background: rgba(126, 200, 255, 0.15);
+            border-color: rgba(126, 200, 255, 0.3);
+            color: var(--accent);
+        }
+        .btn.good {
+            background: rgba(126, 255, 180, 0.12);
+            border-color: rgba(126, 255, 180, 0.25);
+            color: var(--good);
+        }
+        .btn.warn {
+            background: rgba(255, 158, 158, 0.12);
+            border-color: rgba(255, 158, 158, 0.24);
+            color: var(--warn);
+        }
+        .btn.draw-btn {
+            background: rgba(255, 183, 77, 0.14);
+            border-color: rgba(255, 183, 77, 0.28);
+            color: var(--draw);
+        }
+        .btn.active-btn {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.4);
+            color: var(--accent2);
+            box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
 
-  .row + .row{
-    margin-top:8px;
-  }
+        .fileBtn {
+            position: relative;
+            overflow: hidden;
+        }
+        .fileBtn input {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
 
-  .btn, .fileBtn{
-    appearance:none;
-    border:1px solid var(--border);
-    background:var(--panel2);
-    color:var(--text);
-    border-radius:14px;
-    padding:10px 12px;
-    font-size:13px;
-    font-weight:700;
-    cursor:pointer;
-    line-height:1;
-    text-align:center;
-  }
+        .sliderWrap {
+            display: grid;
+            grid-template-columns: 75px 1fr 55px;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .label {
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+        .value {
+            font-size: 11px;
+            color: var(--text);
+            text-align: right;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            height: 4px;
+            cursor: pointer;
+        }
+        input[type="color"] {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            background: transparent;
+            padding: 2px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border-radius: 50%;
+            border: none;
+        }
 
-  .btn:active, .fileBtn:active{
-    transform:scale(.98);
-  }
+        .hint {
+            margin-top: 8px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--muted);
+            text-align: center;
+        }
 
-  .btn.primary{
-    background:rgba(139,211,255,.16);
-    border-color:rgba(139,211,255,.28);
-  }
+        /* ── Toast ────────────────────── */
+        #toast {
+            position: fixed;
+            left: 50%;
+            bottom: 140px;
+            transform: translateX(-50%);
+            z-index: 55;
+            background: rgba(0, 0, 0, 0.78);
+            color: #fff;
+            padding: 9px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-size: 12.5px;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            max-width: calc(100vw - 24px);
+            text-align: center;
+            white-space: nowrap;
+        }
+        #toast.show {
+            opacity: 1;
+        }
 
-  .btn.good{
-    background:rgba(143,255,187,.14);
-    border-color:rgba(143,255,187,.26);
-  }
+        /* ── Show UI Button ──────────── */
+        #showUiBtn {
+            position: fixed;
+            top: max(10px, env(safe-area-inset-top, 10px));
+            right: 10px;
+            z-index: 35;
+            display: none;
+            pointer-events: auto;
+            border-radius: 20px;
+            padding: 9px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+        .hideUI #showUiBtn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-  .btn.warn{
-    background:rgba(255,180,180,.14);
-    border-color:rgba(255,180,180,.24);
-  }
-
-  .fileBtn{
-    position:relative;
-    overflow:hidden;
-  }
-
-  .fileBtn input{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    opacity:0;
-    cursor:pointer;
-  }
-
-  .sliderWrap{
-    display:grid;
-    grid-template-columns:90px 1fr 60px;
-    gap:10px;
-    align-items:center;
-    margin-top:10px;
-  }
-
-  .label{
-    font-size:12px;
-    color:var(--muted);
-  }
-
-  .value{
-    font-size:12px;
-    color:var(--text);
-    text-align:right;
-  }
-
-  input[type="range"]{
-    width:100%;
-    accent-color:var(--accent);
-  }
-
-  .hint{
-    margin-top:10px;
-    font-size:12px;
-    line-height:1.5;
-    color:var(--muted);
-  }
-
-  #starter{
-    position:fixed;
-    inset:0;
-    z-index:40;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:radial-gradient(circle at center, rgba(24,30,40,.96), rgba(0,0,0,.98));
-    color:#fff;
-  }
-
-  #starterCard{
-    width:min(380px, calc(100vw - 32px));
-    border:1px solid rgba(255,255,255,.12);
-    border-radius:24px;
-    background:rgba(255,255,255,.06);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
-    padding:22px;
-    text-align:center;
-    box-shadow:0 18px 50px rgba(0,0,0,.35);
-  }
-
-  #starterCard h1{
-    margin:0 0 10px;
-    font-size:24px;
-    font-weight:900;
-  }
-
-  #starterCard p{
-    margin:0;
-    color:rgba(255,255,255,.78);
-    font-size:14px;
-    line-height:1.6;
-  }
-
-  #starterActions{
-    display:flex;
-    gap:10px;
-    justify-content:center;
-    flex-wrap:wrap;
-    margin-top:16px;
-  }
-
-  #errorMsg{
-    margin-top:12px;
-    color:var(--warn);
-    font-size:13px;
-    line-height:1.5;
-    min-height:18px;
-  }
-
-  .hideUI #topBar,
-  .hideUI #bottomPanel{
-    display:none !important;
-  }
-
-  #showUiBtn{
-    position:fixed;
-    top:12px;
-    right:12px;
-    z-index:35;
-    display:none;
-  }
-
-  .hideUI #showUiBtn{
-    display:inline-flex;
-  }
-
-  .hiddenFile{
-    display:none;
-  }
-
-  #toast{
-    position:fixed;
-    left:50%;
-    bottom:124px;
-    transform:translateX(-50%);
-    z-index:50;
-    background:rgba(0,0,0,.72);
-    color:#fff;
-    padding:10px 14px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,.14);
-    font-size:13px;
-    display:none;
-    backdrop-filter:blur(16px);
-    -webkit-backdrop-filter:blur(16px);
-    max-width:calc(100vw - 24px);
-    text-align:center;
-  }
-</style>
+        /* ── Responsive ──────────────── */
+        @media (max-width: 480px) {
+            .btn {
+                padding: 8px 10px;
+                font-size: 11px;
+                border-radius: 8px;
+            }
+            .sliderWrap {
+                grid-template-columns: 60px 1fr 44px;
+                gap: 6px;
+            }
+            #bottomPanel {
+                padding: 10px;
+                border-radius: 16px;
+                left: 4px;
+                right: 4px;
+                bottom: max(4px, env(safe-area-inset-bottom, 4px));
+            }
+            .chip {
+                padding: 7px 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
 </head>
 <body>
-<video id="camera" autoplay playsinline muted></video>
 
-<div id="overlayWrap">
-  <img id="overlayImg" alt="overlay" />
-</div>
+    <!-- Camera feed -->
+    <video id="camera" autoplay playsinline muted loop></video>
 
-<div id="guides">
-  <div class="line v1"></div>
-  <div class="line v2"></div>
-  <div class="line h1"></div>
-  <div class="line h2"></div>
-  <div class="line centerV"></div>
-  <div class="line centerH"></div>
-</div>
+    <!-- Grid overlay (matches image position) -->
+    <div id="gridOverlay"></div>
 
-<div id="starter">
-  <div id="starterCard">
-    <h1>AR Trace Pro</h1>
-    <p>Load an image, place it on paper, then drag, pinch, rotate, and trace in real life.</p>
-    <div id="starterActions">
-      <label class="btn primary fileBtn">
-        Load Image
-        <input id="fileInput" type="file" accept="image/*" />
-      </label>
-      <button class="btn good" id="startCameraBtn">Start Camera</button>
+    <!-- Guide lines -->
+    <div id="guides">
+        <div class="g-line g-v1"></div>
+        <div class="g-line g-v2"></div>
+        <div class="g-line g-h1"></div>
+        <div class="g-line g-h2"></div>
+        <div class="g-line g-cv"></div>
+        <div class="g-line g-ch"></div>
     </div>
-    <div id="errorMsg"></div>
-  </div>
-</div>
 
-<button class="chip" id="showUiBtn">Show UI</button>
-<div id="toast"></div>
+    <!-- Image overlay -->
+    <div id="overlayWrap">
+        <img id="overlayImg" alt="trace overlay" />
+    </div>
 
-<div id="topBar">
-  <div class="chip">
-    <b>AR Trace Pro</b>
-    <span id="statusText">Ready</span>
-  </div>
-  <div class="chip">
-    <span id="modeText">Normal</span>
-  </div>
-</div>
+    <!-- Drawing canvas (above overlay, below UI) -->
+    <canvas id="drawCanvas"></canvas>
 
-<div id="bottomPanel">
-  <div class="row">
-    <label class="btn primary fileBtn">
-      Load Image
-      <input id="fileInput2" type="file" accept="image/*" />
-    </label>
-    <button class="btn" id="fitBtn">Fit</button>
-    <button class="btn" id="resetBtn">Reset</button>
-    <button class="btn" id="lockBtn">Lock: Off</button>
-    <button class="btn" id="uiBtn">Hide UI</button>
-    <button class="btn" id="fullBtn">Fullscreen</button>
-  </div>
+    <!-- Starter screen -->
+    <div id="starter">
+        <div id="starterCard">
+            <h1>AR Trace Pro</h1>
+            <p>Load an image, place it over your paper, lock it, and trace in real life.<br />Or use <strong>Draw Mode</strong> to trace digitally.</p>
+            <div id="starterActions">
+                <label class="btn primary fileBtn">
+                    📁 Load Image
+                    <input id="fileInput" type="file" accept="image/*" />
+                </label>
+                <button class="btn good" id="startCameraBtn">📷 Start Camera</button>
+            </div>
+            <div id="errorMsg"></div>
+        </div>
+    </div>
 
-  <div class="row">
-    <button class="btn good" id="normalBtn">Normal</button>
-    <button class="btn good" id="outlineBtn">Outline</button>
-    <button class="btn" id="mirrorBtn">Mirror</button>
-    <button class="btn" id="rotLBtn">Rotate -90°</button>
-    <button class="btn" id="rotRBtn">Rotate +90°</button>
-    <button class="btn" id="cameraBtn">Switch Camera</button>
-    <button class="btn" id="guidesBtn">Guides: Off</button>
-  </div>
+    <!-- Show UI button (when hidden) -->
+    <button class="chip" id="showUiBtn">👁 Show UI</button>
 
-  <div class="sliderWrap">
-    <div class="label">Opacity</div>
-    <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.58" />
-    <div class="value" id="opacityValue">58%</div>
-  </div>
+    <!-- Toast -->
+    <div id="toast"></div>
 
-  <div class="sliderWrap">
-    <div class="label">Scale</div>
-    <input id="scaleRange" type="range" min="0.15" max="8" step="0.01" value="1" />
-    <div class="value" id="scaleValue">1.00x</div>
-  </div>
+    <!-- Top bar -->
+    <div id="topBar">
+        <div class="chip">
+            <span class="dot" id="statusDot"></span>
+            <b>AR Trace Pro</b>
+            <span id="statusText">Ready</span>
+        </div>
+        <div class="chip" id="modeChip">
+            <span id="modeText">Normal</span>
+        </div>
+    </div>
 
-  <div class="sliderWrap">
-    <div class="label">Brightness</div>
-    <input id="brightnessRange" type="range" min="0" max="2" step="0.01" value="1" />
-    <div class="value" id="brightnessValue">1.00</div>
-  </div>
+    <!-- Bottom panel -->
+    <div id="bottomPanel">
+        <!-- Row 1: File & View -->
+        <div class="row">
+            <label class="btn primary fileBtn">
+                📁 Load
+                <input id="fileInput2" type="file" accept="image/*" />
+            </label>
+            <button class="btn" id="fitBtn">Fit</button>
+            <button class="btn" id="resetBtn">↺ Reset</button>
+            <button class="btn" id="lockBtn">🔒 Lock: Off</button>
+            <button class="btn" id="uiBtn">👁 Hide UI</button>
+            <button class="btn" id="fullBtn">⛶ Full</button>
+            <button class="btn" id="screenshotBtn">📸 Snap</button>
+        </div>
 
-  <div class="sliderWrap">
-    <div class="label">Contrast</div>
-    <input id="contrastRange" type="range" min="0" max="3" step="0.01" value="1" />
-    <div class="value" id="contrastValue">1.00</div>
-  </div>
+        <!-- Row 2: Modes -->
+        <div class="row">
+            <button class="btn good" id="normalBtn">Normal</button>
+            <button class="btn good" id="outlineBtn">Outline</button>
+            <button class="btn" id="mirrorBtn">⇔ Mirror</button>
+            <button class="btn" id="rotLBtn">↺ -90°</button>
+            <button class="btn" id="rotRBtn">↻ +90°</button>
+            <button class="btn" id="cameraBtn">📷 Flip Cam</button>
+            <button class="btn" id="guidesBtn">📐 Guides</button>
+            <button class="btn" id="gridBtn">⊞ Grid</button>
+        </div>
 
-  <div class="sliderWrap">
-    <div class="label">Saturation</div>
-    <input id="saturationRange" type="range" min="0" max="3" step="0.01" value="1" />
-    <div class="value" id="saturationValue">1.00</div>
-  </div>
+        <!-- Row 3: Draw tools -->
+        <div class="row centered">
+            <button class="btn draw-btn" id="drawToggleBtn">✏ Draw: Off</button>
+            <button class="btn" id="drawClearBtn" disabled>Clear Draw</button>
+            <button class="btn" id="drawUndoBtn" disabled>↩ Undo</button>
+            <input type="color" id="drawColor" value="#ff3333" title="Brush color" />
+            <span class="label" style="margin:0 2px;">Size</span>
+            <input type="range" id="drawSize" min="1" max="20" value="3" style="width:60px;" title="Brush size" />
+            <button class="btn warn" id="drawEraserBtn">Eraser</button>
+        </div>
 
-  <div class="sliderWrap">
-    <div class="label">Blur</div>
-    <input id="blurRange" type="range" min="0" max="8" step="0.1" value="0" />
-    <div class="value" id="blurValue">0.0px</div>
-  </div>
+        <!-- Sliders -->
+        <div class="sliderWrap">
+            <div class="label">Opacity</div>
+            <input id="opacityRange" type="range" min="0" max="1" step="0.01" value="0.58" />
+            <div class="value" id="opacityValue">58%</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Scale</div>
+            <input id="scaleRange" type="range" min="0.15" max="8" step="0.01" value="1" />
+            <div class="value" id="scaleValue">1.00x</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Edge Threshold</div>
+            <input id="edgeThreshold" type="range" min="10" max="120" step="1" value="40" />
+            <div class="value" id="edgeThresholdValue">40</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Brightness</div>
+            <input id="brightnessRange" type="range" min="0" max="2" step="0.01" value="1" />
+            <div class="value" id="brightnessValue">1.00</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Contrast</div>
+            <input id="contrastRange" type="range" min="0" max="3" step="0.01" value="1" />
+            <div class="value" id="contrastValue">1.00</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Saturation</div>
+            <input id="saturationRange" type="range" min="0" max="3" step="0.01" value="1" />
+            <div class="value" id="saturationValue">1.00</div>
+        </div>
+        <div class="sliderWrap">
+            <div class="label">Blur</div>
+            <input id="blurRange" type="range" min="0" max="8" step="0.1" value="0" />
+            <div class="value" id="blurValue">0.0px</div>
+        </div>
 
-  <div class="hint">
-    One finger moves the image. Two fingers pinch to zoom and rotate. Keep the phone on a stand for the best tracing accuracy.
-  </div>
-</div>
+        <div class="hint">
+            💡 <strong>Tips:</strong> One finger moves | Two fingers pinch/rotate | Press <strong>Lock</strong> to trace |
+            <strong>Draw Mode</strong> for digital tracing | Keys: <strong>G</strong>=Guides <strong>L</strong>=Lock
+            <strong>D</strong>=Draw <strong>F</strong>=Fit
+        </div>
+    </div>
 
-<script>
-(() => {
-  const LS_KEY = 'ar_trace_pro_v3';
+    <script>
+        (() => {
+            // ──────────────────────────────────────
+            // DOM REFS
+            // ──────────────────────────────────────
+            const $ = (sel) => document.querySelector(sel);
+            const $$ = (sel) => document.querySelectorAll(sel);
 
-  const camera = document.getElementById('camera');
-  const overlayWrap = document.getElementById('overlayWrap');
-  const overlayImg = document.getElementById('overlayImg');
-  const starter = document.getElementById('starter');
-  const errorMsg = document.getElementById('errorMsg');
-  const statusText = document.getElementById('statusText');
-  const modeText = document.getElementById('modeText');
-  const showUiBtn = document.getElementById('showUiBtn');
-  const toast = document.getElementById('toast');
+            const camera = $('#camera');
+            const overlayWrap = $('#overlayWrap');
+            const overlayImg = $('#overlayImg');
+            const drawCanvas = $('#drawCanvas');
+            const drawCtx = drawCanvas.getContext('2d');
+            const gridOverlay = $('#gridOverlay');
+            const starter = $('#starter');
+            const errorMsg = $('#errorMsg');
+            const statusText = $('#statusText');
+            const statusDot = $('#statusDot');
+            const modeText = $('#modeText');
+            const modeChip = $('#modeChip');
+            const showUiBtn = $('#showUiBtn');
+            const toast = $('#toast');
+            const guidesEl = $('#guides');
 
-  const fileInput = document.getElementById('fileInput');
-  const fileInput2 = document.getElementById('fileInput2');
-  const startCameraBtn = document.getElementById('startCameraBtn');
+            // Buttons
+            const fileInput = $('#fileInput');
+            const fileInput2 = $('#fileInput2');
+            const startCameraBtn = $('#startCameraBtn');
+            const fitBtn = $('#fitBtn');
+            const resetBtn = $('#resetBtn');
+            const lockBtn = $('#lockBtn');
+            const uiBtn = $('#uiBtn');
+            const fullBtn = $('#fullBtn');
+            const screenshotBtn = $('#screenshotBtn');
+            const normalBtn = $('#normalBtn');
+            const outlineBtn = $('#outlineBtn');
+            const mirrorBtn = $('#mirrorBtn');
+            const rotLBtn = $('#rotLBtn');
+            const rotRBtn = $('#rotRBtn');
+            const cameraBtn = $('#cameraBtn');
+            const guidesBtn = $('#guidesBtn');
+            const gridBtn = $('#gridBtn');
+            const drawToggleBtn = $('#drawToggleBtn');
+            const drawClearBtn = $('#drawClearBtn');
+            const drawUndoBtn = $('#drawUndoBtn');
+            const drawColor = $('#drawColor');
+            const drawSize = $('#drawSize');
+            const drawEraserBtn = $('#drawEraserBtn');
 
-  const fitBtn = document.getElementById('fitBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const lockBtn = document.getElementById('lockBtn');
-  const uiBtn = document.getElementById('uiBtn');
-  const fullBtn = document.getElementById('fullBtn');
-  const normalBtn = document.getElementById('normalBtn');
-  const outlineBtn = document.getElementById('outlineBtn');
-  const mirrorBtn = document.getElementById('mirrorBtn');
-  const rotLBtn = document.getElementById('rotLBtn');
-  const rotRBtn = document.getElementById('rotRBtn');
-  const cameraBtn = document.getElementById('cameraBtn');
-  const guidesBtn = document.getElementById('guidesBtn');
+            // Sliders
+            const opacityRange = $('#opacityRange');
+            const scaleRange = $('#scaleRange');
+            const edgeThreshold = $('#edgeThreshold');
+            const brightnessRange = $('#brightnessRange');
+            const contrastRange = $('#contrastRange');
+            const saturationRange = $('#saturationRange');
+            const blurRange = $('#blurRange');
 
-  const opacityRange = document.getElementById('opacityRange');
-  const scaleRange = document.getElementById('scaleRange');
-  const brightnessRange = document.getElementById('brightnessRange');
-  const contrastRange = document.getElementById('contrastRange');
-  const saturationRange = document.getElementById('saturationRange');
-  const blurRange = document.getElementById('blurRange');
+            // Value displays
+            const opacityValue = $('#opacityValue');
+            const scaleValue = $('#scaleValue');
+            const edgeThresholdValue = $('#edgeThresholdValue');
+            const brightnessValue = $('#brightnessValue');
+            const contrastValue = $('#contrastValue');
+            const saturationValue = $('#saturationValue');
+            const blurValue = $('#blurValue');
 
-  const opacityValue = document.getElementById('opacityValue');
-  const scaleValue = document.getElementById('scaleValue');
-  const brightnessValue = document.getElementById('brightnessValue');
-  const contrastValue = document.getElementById('contrastValue');
-  const saturationValue = document.getElementById('saturationValue');
-  const blurValue = document.getElementById('blurValue');
+            // ──────────────────────────────────────
+            // STATE
+            // ──────────────────────────────────────
+            const LS_KEY = 'ar_trace_pro_v4';
+            const state = {
+                cx: window.innerWidth / 2,
+                cy: window.innerHeight / 2,
+                baseW: 340,
+                baseH: 340,
+                scale: 1,
+                rotation: 0,
+                flipX: 1,
+                opacity: 0.58,
+                brightness: 1,
+                contrast: 1,
+                saturation: 1,
+                blur: 0,
+                edgeThresh: 40,
+                mode: 'normal', // 'normal' | 'outline'
+                locked: false,
+                guides: false,
+                gridVisible: false,
+                uiHidden: false,
+                drawMode: false,
+                drawColor: '#ff3333',
+                drawSize: 3,
+                drawEraser: false,
+                facingMode: 'environment',
+                originalSrc: '',
+                outlineSrc: '',
+                drawHistory: [], // array of ImageData for undo
+                drawHistoryIndex: -1,
+            };
 
-  const guidesEl = document.getElementById('guides');
+            let stream = null;
+            const pointers = new Map();
+            let drag = null;
+            let gesture = null;
+            let isDrawing = false;
+            let lastDrawPoint = null;
+            let toastTimer = null;
 
-  const state = {
-    cx: window.innerWidth / 2,
-    cy: window.innerHeight / 2,
-    baseW: 340,
-    baseH: 340,
-    scale: 1,
-    rotation: 0,
-    flipX: 1,
-    opacity: 0.58,
-    brightness: 1,
-    contrast: 1,
-    saturation: 1,
-    blur: 0,
-    mode: 'normal',
-    locked: false,
-    guides: false,
-    uiHidden: false,
-    facingMode: 'environment',
-    originalSrc: '',
-    outlineSrc: ''
-  };
+            // ──────────────────────────────────────
+            // UTILS
+            // ──────────────────────────────────────
+            const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+            const round2 = (n) => Math.round(n * 100) / 100;
 
-  let stream = null;
-  const pointers = new Map();
-  let drag = null;
-  let gesture = null;
-
-  function clamp(n, min, max) {
-    return Math.max(min, Math.min(max, n));
-  }
-
-  function toastMsg(text, ms = 1300) {
-    toast.textContent = text;
-    toast.style.display = 'block';
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => {
-      toast.style.display = 'none';
-    }, ms);
-  }
-
-  function setStatus(text) {
-    statusText.textContent = text;
-  }
-
-  function setMode(text) {
-    modeText.textContent = text;
-  }
-
-  function saveSettings() {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        cx: state.cx,
-        cy: state.cy,
-        baseW: state.baseW,
-        baseH: state.baseH,
-        scale: state.scale,
-        rotation: state.rotation,
-        flipX: state.flipX,
-        opacity: state.opacity,
-        brightness: state.brightness,
-        contrast: state.contrast,
-        saturation: state.saturation,
-        blur: state.blur,
-        mode: state.mode,
-        locked: state.locked,
-        guides: state.guides,
-        uiHidden: state.uiHidden,
-        facingMode: state.facingMode,
-        originalSrc: state.originalSrc,
-        outlineSrc: state.outlineSrc
-      }));
-    } catch (_) {}
-  }
-
-  function loadSettings() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      Object.assign(state, saved || {});
-    } catch (_) {}
-  }
-
-  function updateLabels() {
-    opacityValue.textContent = `${Math.round(state.opacity * 100)}%`;
-    scaleValue.textContent = `${state.scale.toFixed(2)}x`;
-    brightnessValue.textContent = state.brightness.toFixed(2);
-    contrastValue.textContent = state.contrast.toFixed(2);
-    saturationValue.textContent = state.saturation.toFixed(2);
-    blurValue.textContent = `${state.blur.toFixed(1)}px`;
-    lockBtn.textContent = `Lock: ${state.locked ? 'On' : 'Off'}`;
-    uiBtn.textContent = state.uiHidden ? 'Show UI' : 'Hide UI';
-    guidesBtn.textContent = `Guides: ${state.guides ? 'On' : 'Off'}`;
-    setMode(state.mode === 'outline' ? 'Outline' : 'Normal');
-  }
-
-  function updateOverlay() {
-    overlayWrap.style.left = `${state.cx}px`;
-    overlayWrap.style.top = `${state.cy}px`;
-    overlayWrap.style.width = `${state.baseW}px`;
-    overlayWrap.style.height = `${state.baseH}px`;
-    overlayWrap.style.opacity = String(state.opacity);
-    overlayWrap.style.transform =
-      `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
-
-    overlayImg.style.filter =
-      `brightness(${state.brightness}) contrast(${state.contrast}) saturate(${state.saturation}) blur(${state.blur}px)`;
-
-    opacityRange.value = String(state.opacity);
-    scaleRange.value = String(state.scale);
-    brightnessRange.value = String(state.brightness);
-    contrastRange.value = String(state.contrast);
-    saturationRange.value = String(state.saturation);
-    blurRange.value = String(state.blur);
-
-    document.body.classList.toggle('hideUI', state.uiHidden);
-    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
-    guidesEl.style.display = state.guides ? 'block' : 'none';
-
-    updateLabels();
-    saveSettings();
-  }
-
-  function applyImageSource() {
-    const src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state.originalSrc;
-    if (src) overlayImg.src = src;
-    updateOverlay();
-  }
-
-  function centerOverlay() {
-    state.cx = window.innerWidth / 2;
-    state.cy = window.innerHeight / 2;
-    updateOverlay();
-  }
-
-  function setImageBaseSize() {
-    if (!overlayImg.naturalWidth || !overlayImg.naturalHeight) return;
-
-    const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    let w = Math.min(vw * 0.72, 500);
-    let h = w * ratio;
-
-    if (h > vh * 0.72) {
-      h = vh * 0.72;
-      w = h / ratio;
-    }
-
-    state.baseW = w;
-    state.baseH = h;
-    state.scale = 1;
-    centerOverlay();
-  }
-
-  async function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-  }
-
-  async function startCamera() {
-    errorMsg.textContent = '';
-    setStatus('Starting camera...');
-
-    try {
-      await stopCamera();
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported.');
-      }
-
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: state.facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      });
-
-      camera.srcObject = stream;
-      await camera.play();
-
-      setStatus(state.facingMode === 'user' ? 'Front camera' : 'Rear camera');
-    } catch (err) {
-      console.error(err);
-      errorMsg.textContent = 'Camera failed. Open this site in Safari over HTTPS and allow camera permission.';
-      setStatus('Camera error');
-    }
-  }
-
-  function buildOutlineDataUrl(src) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const maxDim = 1600;
-          let w = img.width;
-          let h = img.height;
-
-          if (w > h && w > maxDim) {
-            h = Math.round(h * (maxDim / w));
-            w = maxDim;
-          } else if (h >= w && h > maxDim) {
-            w = Math.round(w * (maxDim / h));
-            h = maxDim;
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0, w, h);
-
-          const srcData = ctx.getImageData(0, 0, w, h);
-          const d = srcData.data;
-          const gray = new Float32Array(w * h);
-
-          for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-            gray[p] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-          }
-
-          const out = ctx.createImageData(w, h);
-          const o = out.data;
-
-          const threshold = 40;
-          const scaleFactor = 5.8;
-
-          for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-              const i = y * w + x;
-
-              const tl = gray[i - w - 1];
-              const tc = gray[i - w];
-              const tr = gray[i - w + 1];
-              const ml = gray[i - 1];
-              const mr = gray[i + 1];
-              const bl = gray[i + w - 1];
-              const bc = gray[i + w];
-              const br = gray[i + w + 1];
-
-              const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
-              const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
-              const mag = Math.sqrt(gx * gx + gy * gy);
-              const edge = clamp((mag - threshold) * scaleFactor, 0, 255);
-
-              const idx = i * 4;
-              if (edge > 0) {
-                o[idx] = 0;
-                o[idx + 1] = 0;
-                o[idx + 2] = 0;
-                o[idx + 3] = edge;
-              } else {
-                o[idx + 3] = 0;
-              }
+            function showToast(text, ms = 1400) {
+                toast.textContent = text;
+                toast.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => toast.classList.remove('show'), ms);
             }
-          }
 
-          ctx.putImageData(out, 0, 0);
-          resolve(canvas.toDataURL('image/png'));
-        } catch (e) {
-          reject(e);
-        }
-      };
-      img.onerror = reject;
-      img.src = src;
-    });
-  }
+            function setStatus(text, ok = true) {
+                statusText.textContent = text;
+                statusDot.className = 'dot' + (ok ? '' : ' warn');
+            }
 
-  async function loadImageFile(file) {
-    if (!file) return;
+            function setMode(text) {
+                modeText.textContent = text;
+                if (text === 'Outline') {
+                    modeChip.style.borderColor = 'rgba(126,255,180,0.4)';
+                } else if (text === 'Draw') {
+                    modeChip.style.borderColor = 'rgba(255,183,77,0.4)';
+                } else {
+                    modeChip.style.borderColor = 'rgba(255,255,255,0.1)';
+                }
+            }
 
-    const src = URL.createObjectURL(file);
-    state.originalSrc = src;
-    state.outlineSrc = '';
-    state.mode = 'normal';
+            // ──────────────────────────────────────
+            // PERSISTENCE
+            // ──────────────────────────────────────
+            function saveSettings() {
+                try {
+                    const s = { ...state };
+                    delete s.drawHistory;
+                    s.drawHistoryIndex = -1;
+                    localStorage.setItem(LS_KEY, JSON.stringify(s));
+                } catch (_) {}
+            }
 
-    overlayImg.onload = () => {
-      setImageBaseSize();
-      applyImageSource();
-      updateOverlay();
-      starter.style.display = 'none';
-      setStatus('Image loaded');
-      toastMsg('Image loaded');
-    };
+            function loadSettings() {
+                try {
+                    const raw = localStorage.getItem(LS_KEY);
+                    if (!raw) return;
+                    const saved = JSON.parse(raw);
+                    Object.assign(state, saved || {});
+                    state.drawHistory = [];
+                    state.drawHistoryIndex = -1;
+                } catch (_) {}
+            }
 
-    overlayImg.src = src;
+            // ──────────────────────────────────────
+            // UPDATE DISPLAY
+            // ──────────────────────────────────────
+            function updateLabels() {
+                opacityValue.textContent = `${Math.round(state.opacity * 100)}%`;
+                scaleValue.textContent = `${state.scale.toFixed(2)}x`;
+                edgeThresholdValue.textContent = String(state.edgeThresh);
+                brightnessValue.textContent = state.brightness.toFixed(2);
+                contrastValue.textContent = state.contrast.toFixed(2);
+                saturationValue.textContent = state.saturation.toFixed(2);
+                blurValue.textContent = `${state.blur.toFixed(1)}px`;
+                lockBtn.textContent = `🔒 Lock: ${state.locked ? 'On' : 'Off'}`;
+                uiBtn.textContent = state.uiHidden ? '👁 Show UI' : '👁 Hide UI';
+                guidesBtn.textContent = `📐 Guides: ${state.guides ? 'On' : 'Off'}`;
+                gridBtn.textContent = `⊞ Grid: ${state.gridVisible ? 'On' : 'Off'}`;
+                drawToggleBtn.textContent = `✏ Draw: ${state.drawMode ? 'On' : 'Off'}`;
+                drawToggleBtn.classList.toggle('active-btn', state.drawMode);
+                drawEraserBtn.classList.toggle('active-btn', state.drawEraser);
 
-    try {
-      setStatus('Building outline...');
-      const outline = await buildOutlineDataUrl(src);
-      state.outlineSrc = outline;
-      if (state.mode === 'outline') {
-        overlayImg.src = outline;
-      }
-      saveSettings();
-    } catch (e) {
-      console.error(e);
-      setStatus('Image loaded');
-    }
-  }
+                if (state.mode === 'outline') setMode('Outline');
+                else if (state.drawMode) setMode('Draw');
+                else setMode('Normal');
+            }
 
-  function getDistance(a, b) {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
+            function updateOverlay() {
+                overlayWrap.style.left = `${state.cx}px`;
+                overlayWrap.style.top = `${state.cy}px`;
+                overlayWrap.style.width = `${state.baseW}px`;
+                overlayWrap.style.height = `${state.baseH}px`;
+                overlayWrap.style.opacity = String(state.opacity);
+                overlayWrap.style.transform =
+                    `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
+                overlayWrap.classList.toggle('locked', state.locked);
 
-  function getAngle(a, b) {
-    return Math.atan2(b.y - a.y, b.x - a.x);
-  }
+                overlayImg.style.filter =
+                    `brightness(${state.brightness}) contrast(${state.contrast}) saturate(${state.saturation}) blur(${state.blur}px)`;
 
-  function getCenter(a, b) {
-    return {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2
-    };
-  }
+                // Sync drawing canvas
+                syncDrawCanvas();
 
-  function beginDrag(p) {
-    drag = {
-      id: p.id,
-      startX: p.x,
-      startY: p.y,
-      originCx: state.cx,
-      originCy: state.cy
-    };
-    setStatus('Dragging');
-  }
+                // Sync grid overlay
+                gridOverlay.style.left = `${state.cx}px`;
+                gridOverlay.style.top = `${state.cy}px`;
+                gridOverlay.style.width = `${state.baseW}px`;
+                gridOverlay.style.height = `${state.baseH}px`;
+                gridOverlay.style.transform =
+                    `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
+                gridOverlay.classList.toggle('visible', state.gridVisible);
 
-  function beginGesture(p1, p2) {
-    gesture = {
-      id1: p1.id,
-      id2: p2.id,
-      startDist: getDistance(p1, p2),
-      startAngle: getAngle(p1, p2),
-      startScale: state.scale,
-      startRotation: state.rotation,
-      startCx: state.cx,
-      startCy: state.cy,
-      startCenter: getCenter(p1, p2)
-    };
-    drag = null;
-    setStatus('Pinch / rotate');
-  }
+                // Slider sync
+                opacityRange.value = String(state.opacity);
+                scaleRange.value = String(state.scale);
+                edgeThreshold.value = String(state.edgeThresh);
+                brightnessRange.value = String(state.brightness);
+                contrastRange.value = String(state.contrast);
+                saturationRange.value = String(state.saturation);
+                blurRange.value = String(state.blur);
+                drawColor.value = state.drawColor;
+                drawSize.value = String(state.drawSize);
 
-  function updateDrag(p) {
-    if (!drag) return;
-    const dx = p.x - drag.startX;
-    const dy = p.y - drag.startY;
-    state.cx = drag.originCx + dx;
-    state.cy = drag.originCy + dy;
-    updateOverlay();
-  }
+                // UI visibility
+                document.body.classList.toggle('hideUI', state.uiHidden);
+                showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
+                guidesEl.classList.toggle('visible', state.guides);
 
-  function updateGesture(p1, p2) {
-    if (!gesture) return;
+                // Draw canvas
+                drawCanvas.classList.toggle('active', state.drawMode);
+                drawClearBtn.disabled = !state.drawMode;
+                drawUndoBtn.disabled = !state.drawMode || state.drawHistory.length <= 1;
+                drawCanvas.style.pointerEvents = state.drawMode ? 'auto' : 'none';
+                if (state.drawMode) {
+                    drawCanvas.style.cursor = state.drawEraser ? 'cell' : 'crosshair';
+                }
 
-    const dist = getDistance(p1, p2);
-    const angle = getAngle(p1, p2);
-    const center = getCenter(p1, p2);
+                updateLabels();
+                saveSettings();
+            }
 
-    state.scale = clamp(gesture.startScale * (dist / gesture.startDist), 0.15, 8);
-    state.rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180 / Math.PI);
+            function syncDrawCanvas() {
+                drawCanvas.style.left = `${state.cx}px`;
+                drawCanvas.style.top = `${state.cy}px`;
+                drawCanvas.width = state.baseW;
+                drawCanvas.height = state.baseH;
+                drawCanvas.style.width = `${state.baseW}px`;
+                drawCanvas.style.height = `${state.baseH}px`;
+                drawCanvas.style.transform =
+                    `translate(-50%, -50%) rotate(${state.rotation}deg) scale(${state.scale}) scaleX(${state.flipX})`;
+                // Restore drawing after resize
+                restoreDrawingOnCanvas();
+            }
 
-    state.cx = gesture.startCx + (center.x - gesture.startCenter.x);
-    state.cy = gesture.startCy + (center.y - gesture.startCenter.y);
+            function restoreDrawingOnCanvas() {
+                if (state.drawHistory.length > 0 && state.drawHistoryIndex >= 0) {
+                    const imgData = state.drawHistory[state.drawHistoryIndex];
+                    if (imgData && imgData.width === drawCanvas.width && imgData.height === drawCanvas.height) {
+                        drawCtx.putImageData(imgData, 0, 0);
+                    }
+                }
+            }
 
-    scaleRange.value = String(state.scale);
-    updateOverlay();
-  }
+            function applyImageSource() {
+                const src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state.originalSrc;
+                if (src) overlayImg.src = src;
+                updateOverlay();
+            }
 
-  function endPointer(id) {
-    pointers.delete(id);
+            function centerOverlay() {
+                state.cx = window.innerWidth / 2;
+                state.cy = window.innerHeight / 2;
+                updateOverlay();
+            }
 
-    if (state.locked) return;
+            function setImageBaseSize() {
+                if (!overlayImg.naturalWidth || !overlayImg.naturalHeight) return;
+                const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                let w = Math.min(vw * 0.7, 480);
+                let h = w * ratio;
+                if (h > vh * 0.65) {
+                    h = vh * 0.65;
+                    w = h / ratio;
+                }
+                state.baseW = Math.round(w);
+                state.baseH = Math.round(h);
+                state.scale = 1;
+                centerOverlay();
+            }
 
-    if (pointers.size === 0) {
-      drag = null;
-      gesture = null;
-      setStatus(state.mode === 'outline' ? 'Outline' : 'Ready');
-      return;
-    }
+            // ──────────────────────────────────────
+            // CAMERA
+            // ──────────────────────────────────────
+            async function stopCamera() {
+                if (stream) {
+                    stream.getTracks().forEach(t => t.stop());
+                    stream = null;
+                }
+            }
 
-    const pts = Array.from(pointers.values());
-    if (pts.length === 1) {
-      beginDrag(pts[0]);
-      gesture = null;
-    } else if (pts.length >= 2) {
-      beginGesture(pts[0], pts[1]);
-    }
-  }
+            async function startCamera() {
+                errorMsg.textContent = '';
+                setStatus('Starting camera...', true);
+                try {
+                    await stopCamera();
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('Camera API not supported.');
+                    }
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: state.facingMode },
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        },
+                        audio: false,
+                    });
+                    camera.srcObject = stream;
+                    await camera.play();
+                    setStatus(state.facingMode === 'user' ? 'Front camera' : 'Rear camera', true);
+                    statusDot.className = 'dot';
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    errorMsg.textContent =
+                        '⚠ Camera failed. Open in Safari over HTTPS and allow camera permissions.';
+                    setStatus('Camera error', false);
+                    statusDot.className = 'dot warn';
+                }
+            }
 
-  overlayWrap.addEventListener('pointerdown', e => {
-    if (state.locked) return;
-    e.preventDefault();
-    overlayWrap.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+            // ──────────────────────────────────────
+            // OUTLINE GENERATION (Improved Sobel)
+            // ──────────────────────────────────────
+            function buildOutlineDataUrl(src, thresholdOverride) {
+                const thresh = thresholdOverride || state.edgeThresh || 40;
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        try {
+                            const maxDim = 1600;
+                            let w = img.width;
+                            let h = img.height;
+                            if (w > h && w > maxDim) { h = Math.round(h * (maxDim / w));
+                                w = maxDim; } else if (h >= w && h > maxDim) { w = Math.round(w * (maxDim / h));
+                                h = maxDim; }
 
-    const pts = Array.from(pointers.values());
-    if (pts.length === 1) beginDrag(pts[0]);
-    if (pts.length >= 2) beginGesture(pts[0], pts[1]);
-  });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w;
+                            canvas.height = h;
+                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            ctx.drawImage(img, 0, 0, w, h);
 
-  overlayWrap.addEventListener('pointermove', e => {
-    if (state.locked) return;
-    if (!pointers.has(e.pointerId)) return;
+                            const srcData = ctx.getImageData(0, 0, w, h);
+                            const d = srcData.data;
+                            const gray = new Float32Array(w * h);
 
-    e.preventDefault();
-    pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+                            for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+                                gray[p] = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+                            }
 
-    const pts = Array.from(pointers.values());
-    if (pts.length === 1 && drag) {
-      updateDrag(pts[0]);
-    } else if (pts.length >= 2 && gesture) {
-      updateGesture(pts[0], pts[1]);
-    }
-  });
+                            const out = ctx.createImageData(w, h);
+                            const o = out.data;
+                            const scaleFactor = 5.5;
 
-  overlayWrap.addEventListener('pointerup', e => {
-    if (pointers.has(e.pointerId)) endPointer(e.pointerId);
-  });
+                            for (let y = 1; y < h - 1; y++) {
+                                for (let x = 1; x < w - 1; x++) {
+                                    const i = y * w + x;
+                                    const tl = gray[i - w - 1],
+                                        tc = gray[i - w],
+                                        tr = gray[i - w + 1];
+                                    const ml = gray[i - 1],
+                                        mr = gray[i + 1];
+                                    const bl = gray[i + w - 1],
+                                        bc = gray[i + w],
+                                        br = gray[i + w + 1];
+                                    const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+                                    const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+                                    const mag = Math.sqrt(gx * gx + gy * gy);
+                                    const edge = clamp((mag - thresh) * scaleFactor, 0, 255);
+                                    const idx = i * 4;
+                                    if (edge > 3) {
+                                        o[idx] = 0;
+                                        o[idx + 1] = 0;
+                                        o[idx + 2] = 0;
+                                        o[idx + 3] = Math.min(edge, 255);
+                                    } else {
+                                        o[idx + 3] = 0;
+                                    }
+                                }
+                            }
+                            ctx.putImageData(out, 0, 0);
+                            resolve(canvas.toDataURL('image/png'));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    };
+                    img.onerror = reject;
+                    img.src = src;
+                });
+            }
 
-  overlayWrap.addEventListener('pointercancel', e => {
-    if (pointers.has(e.pointerId)) endPointer(e.pointerId);
-  });
+            // ──────────────────────────────────────
+            // IMAGE LOADING
+            // ──────────────────────────────────────
+            async function loadImageFile(file) {
+                if (!file) return;
+                const src = URL.createObjectURL(file);
+                state.originalSrc = src;
+                state.outlineSrc = '';
+                state.mode = 'normal';
+                state.drawHistory = [];
+                state.drawHistoryIndex = -1;
+                clearDrawCanvas();
 
-  overlayWrap.addEventListener('pointerleave', e => {
-    if (pointers.has(e.pointerId)) endPointer(e.pointerId);
-  });
+                overlayImg.onload = () => {
+                    setImageBaseSize();
+                    applyImageSource();
+                    updateOverlay();
+                    starter.classList.add('hidden');
+                    setStatus('Image loaded', true);
+                    showToast('✅ Image loaded');
+                };
+                overlayImg.src = src;
 
-  fileInput.addEventListener('change', e => {
-    const file = e.target.files && e.target.files[0];
-    if (file) loadImageFile(file);
-  });
+                try {
+                    setStatus('Building outline...', true);
+                    const outline = await buildOutlineDataUrl(src);
+                    state.outlineSrc = outline;
+                    if (state.mode === 'outline') overlayImg.src = outline;
+                    saveSettings();
+                    setStatus('Ready', true);
+                } catch (e) {
+                    console.error('Outline build error:', e);
+                    setStatus('Image loaded (no outline)', true);
+                }
+            }
 
-  fileInput2.addEventListener('change', e => {
-    const file = e.target.files && e.target.files[0];
-    if (file) loadImageFile(file);
-  });
+            async function rebuildOutline() {
+                if (!state.originalSrc) return;
+                try {
+                    setStatus('Rebuilding outline...', true);
+                    const outline = await buildOutlineDataUrl(state.originalSrc, state.edgeThresh);
+                    state.outlineSrc = outline;
+                    if (state.mode === 'outline') overlayImg.src = outline;
+                    saveSettings();
+                    updateOverlay();
+                    showToast('✅ Outline updated');
+                    setStatus('Ready', true);
+                } catch (e) {
+                    console.error(e);
+                    showToast('⚠ Outline failed');
+                }
+            }
 
-  startCameraBtn.addEventListener('click', async () => {
-    await startCamera();
-  });
+            let outlineDebounce = null;
+            function debouncedRebuildOutline() {
+                clearTimeout(outlineDebounce);
+                outlineDebounce = setTimeout(rebuildOutline, 400);
+            }
 
-  opacityRange.addEventListener('input', e => {
-    state.opacity = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            // ──────────────────────────────────────
+            // DRAWING CANVAS
+            // ──────────────────────────────────────
+            function clearDrawCanvas() {
+                drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                state.drawHistory = [];
+                state.drawHistoryIndex = -1;
+                // Save blank state
+                const blank = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+                state.drawHistory.push(blank);
+                state.drawHistoryIndex = 0;
+            }
 
-  scaleRange.addEventListener('input', e => {
-    state.scale = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            function saveDrawState() {
+                // Remove any redo states
+                if (state.drawHistoryIndex < state.drawHistory.length - 1) {
+                    state.drawHistory = state.drawHistory.slice(0, state.drawHistoryIndex + 1);
+                }
+                const imgData = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+                state.drawHistory.push(imgData);
+                // Limit history
+                if (state.drawHistory.length > 50) state.drawHistory.shift();
+                state.drawHistoryIndex = state.drawHistory.length - 1;
+                drawUndoBtn.disabled = state.drawHistory.length <= 1;
+            }
 
-  brightnessRange.addEventListener('input', e => {
-    state.brightness = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            function undoDraw() {
+                if (!state.drawMode || state.drawHistoryIndex <= 0) return;
+                state.drawHistoryIndex--;
+                const imgData = state.drawHistory[state.drawHistoryIndex];
+                if (imgData && imgData.width === drawCanvas.width && imgData.height === drawCanvas.height) {
+                    drawCtx.putImageData(imgData, 0, 0);
+                }
+                drawUndoBtn.disabled = state.drawHistoryIndex <= 0;
+                showToast('↩ Undo');
+            }
 
-  contrastRange.addEventListener('input', e => {
-    state.contrast = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            function getDrawPos(e) {
+                const rect = drawCanvas.getBoundingClientRect();
+                const scaleX = drawCanvas.width / rect.width;
+                const scaleY = drawCanvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY,
+                };
+            }
 
-  saturationRange.addEventListener('input', e => {
-    state.saturation = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            function startDraw(e) {
+                if (!state.drawMode || state.locked) return;
+                e.preventDefault();
+                isDrawing = true;
+                const pos = getDrawPos(e);
+                lastDrawPoint = pos;
+                drawCtx.beginPath();
+                drawCtx.moveTo(pos.x, pos.y);
+                drawCtx.lineCap = 'round';
+                drawCtx.lineJoin = 'round';
+                drawCtx.strokeStyle = state.drawEraser ? 'rgba(0,0,0,0)' : state.drawColor;
+                drawCtx.lineWidth = state.drawSize;
+                if (state.drawEraser) {
+                    drawCtx.globalCompositeOperation = 'destination-out';
+                    drawCtx.lineWidth = state.drawSize * 2;
+                } else {
+                    drawCtx.globalCompositeOperation = 'source-over';
+                }
+                // Draw a dot
+                drawCtx.fillStyle = state.drawEraser ? 'rgba(0,0,0,0)' : state.drawColor;
+                drawCtx.beginPath();
+                drawCtx.arc(pos.x, pos.y, (state.drawEraser ? state.drawSize : state.drawSize / 2), 0, Math.PI * 2);
+                drawCtx.fill();
+                drawCtx.beginPath();
+                drawCtx.moveTo(pos.x, pos.y);
+                drawCanvas.setPointerCapture(e.pointerId);
+            }
 
-  blurRange.addEventListener('input', e => {
-    state.blur = parseFloat(e.target.value);
-    updateOverlay();
-  });
+            function moveDraw(e) {
+                if (!isDrawing || !state.drawMode) return;
+                e.preventDefault();
+                const pos = getDrawPos(e);
+                drawCtx.lineTo(pos.x, pos.y);
+                drawCtx.stroke();
+                drawCtx.beginPath();
+                drawCtx.moveTo(pos.x, pos.y);
+                lastDrawPoint = pos;
+            }
 
-  fitBtn.addEventListener('click', () => {
-    if (!overlayImg.src) return;
-    setImageBaseSize();
-    updateOverlay();
-    toastMsg('Fit applied');
-  });
+            function endDraw(e) {
+                if (!isDrawing) return;
+                isDrawing = false;
+                drawCtx.globalCompositeOperation = 'source-over';
+                drawCtx.closePath();
+                lastDrawPoint = null;
+                saveDrawState();
+            }
 
-  resetBtn.addEventListener('click', () => {
-    state.scale = 1;
-    state.rotation = 0;
-    state.flipX = 1;
-    state.opacity = 0.58;
-    state.brightness = 1;
-    state.contrast = 1;
-    state.saturation = 1;
-    state.blur = 0;
-    state.mode = 'normal';
-    scaleRange.value = '1';
-    opacityRange.value = '0.58';
-    brightnessRange.value = '1';
-    contrastRange.value = '1';
-    saturationRange.value = '1';
-    blurRange.value = '0';
-    setMode('Normal');
-    if (state.originalSrc) overlayImg.src = state.originalSrc;
-    centerOverlay();
-    updateOverlay();
-    toastMsg('Reset done');
-  });
+            // ──────────────────────────────────────
+            // TOUCH / POINTER FOR OVERLAY
+            // ──────────────────────────────────────
+            function getDist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
 
-  lockBtn.addEventListener('click', () => {
-    state.locked = !state.locked;
-    updateOverlay();
-    toastMsg(state.locked ? 'Locked' : 'Unlocked');
-  });
+            function getAngle(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
 
-  uiBtn.addEventListener('click', () => {
-    state.uiHidden = !state.uiHidden;
-    updateOverlay();
-  });
+            function getCenter(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
-  showUiBtn.addEventListener('click', () => {
-    state.uiHidden = false;
-    updateOverlay();
-  });
+            function beginDrag(p) {
+                drag = { id: p.id, startX: p.x, startY: p.y, originCx: state.cx, originCy: state.cy };
+                setStatus('Dragging', true);
+            }
 
-  fullBtn.addEventListener('click', async () => {
-    try {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
-        toastMsg('Fullscreen on');
-      } else if (document.exitFullscreen) {
-        await document.exitFullscreen();
-        toastMsg('Fullscreen off');
-      }
-    } catch (_) {
-      toastMsg('Fullscreen unavailable');
-    }
-  });
+            function beginGesture(p1, p2) {
+                gesture = {
+                    id1: p1.id,
+                    id2: p2.id,
+                    startDist: getDist(p1, p2),
+                    startAngle: getAngle(p1, p2),
+                    startScale: state.scale,
+                    startRotation: state.rotation,
+                    startCx: state.cx,
+                    startCy: state.cy,
+                    startCenter: getCenter(p1, p2),
+                };
+                drag = null;
+                setStatus('Pinch/rotate', true);
+            }
 
-  normalBtn.addEventListener('click', () => {
-    state.mode = 'normal';
-    if (state.originalSrc) overlayImg.src = state.originalSrc;
-    setMode('Normal');
-    updateOverlay();
-    toastMsg('Normal mode');
-  });
+            function updateDrag(p) {
+                if (!drag) return;
+                state.cx = drag.originCx + (p.x - drag.startX);
+                state.cy = drag.originCy + (p.y - drag.startY);
+                updateOverlay();
+            }
 
-  outlineBtn.addEventListener('click', () => {
-    state.mode = 'outline';
-    if (state.outlineSrc) overlayImg.src = state.outlineSrc;
-    setMode('Outline');
-    updateOverlay();
-    toastMsg('Outline mode');
-  });
+            function updateGesture(p1, p2) {
+                if (!gesture) return;
+                const dist = getDist(p1, p2);
+                const angle = getAngle(p1, p2);
+                const center = getCenter(p1, p2);
+                state.scale = clamp(gesture.startScale * (dist / gesture.startDist), 0.15, 8);
+                state.rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180 / Math.PI);
+                state.cx = gesture.startCx + (center.x - gesture.startCenter.x);
+                state.cy = gesture.startCy + (center.y - gesture.startCenter.y);
+                updateOverlay();
+            }
 
-  mirrorBtn.addEventListener('click', () => {
-    state.flipX *= -1;
-    updateOverlay();
-  });
+            function endPointer(id) {
+                pointers.delete(id);
+                if (state.locked || state.drawMode) { drag = null;
+                    gesture = null; return; }
+                if (pointers.size === 0) { drag = null;
+                    gesture = null;
+                    setStatus('Ready', true); return; }
+                const pts = Array.from(pointers.values());
+                if (pts.length === 1) { beginDrag(pts[0]);
+                    gesture = null; } else if (pts.length >= 2) { beginGesture(pts[0], pts[1]); }
+            }
 
-  rotLBtn.addEventListener('click', () => {
-    state.rotation -= 90;
-    updateOverlay();
-  });
+            // Overlay pointer events
+            overlayWrap.addEventListener('pointerdown', e => {
+                if (state.locked || state.drawMode) return;
+                e.preventDefault();
+                overlayWrap.setPointerCapture(e.pointerId);
+                pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+                const pts = Array.from(pointers.values());
+                if (pts.length === 1) beginDrag(pts[0]);
+                if (pts.length >= 2) beginGesture(pts[0], pts[1]);
+            });
+            overlayWrap.addEventListener('pointermove', e => {
+                if (state.locked || state.drawMode || !pointers.has(e.pointerId)) return;
+                e.preventDefault();
+                pointers.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+                const pts = Array.from(pointers.values());
+                if (pts.length === 1 && drag) updateDrag(pts[0]);
+                else if (pts.length >= 2 && gesture) updateGesture(pts[0], pts[1]);
+            });
+            overlayWrap.addEventListener('pointerup', e => { if (pointers.has(e.pointerId)) endPointer(e.pointerId); });
+            overlayWrap.addEventListener('pointercancel', e => { if (pointers.has(e.pointerId)) endPointer(e
+                    .pointerId); });
+            overlayWrap.addEventListener('pointerleave', e => { if (pointers.has(e.pointerId)) endPointer(e.pointerId); });
 
-  rotRBtn.addEventListener('click', () => {
-    state.rotation += 90;
-    updateOverlay();
-  });
+            // Draw canvas pointer events
+            drawCanvas.addEventListener('pointerdown', startDraw);
+            drawCanvas.addEventListener('pointermove', moveDraw);
+            drawCanvas.addEventListener('pointerup', endDraw);
+            drawCanvas.addEventListener('pointercancel', endDraw);
+            drawCanvas.addEventListener('pointerleave', endDraw);
 
-  cameraBtn.addEventListener('click', async () => {
-    state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
-    saveSettings();
-    await startCamera();
-  });
+            // ──────────────────────────────────────
+            // BUTTON HANDLERS
+            // ──────────────────────────────────────
+            fileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) loadImageFile(f); });
+            fileInput2.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) loadImageFile(f); });
+            startCameraBtn.addEventListener('click', startCamera);
 
-  guidesBtn.addEventListener('click', () => {
-    state.guides = !state.guides;
-    updateOverlay();
-  });
+            fitBtn.addEventListener('click', () => {
+                if (!overlayImg.src) return;
+                setImageBaseSize();
+                updateOverlay();
+                showToast('📐 Fit to screen');
+            });
+            resetBtn.addEventListener('click', () => {
+                state.scale = 1;
+                state.rotation = 0;
+                state.flipX = 1;
+                state.opacity = 0.58;
+                state.brightness = 1;
+                state.contrast = 1;
+                state.saturation = 1;
+                state.blur = 0;
+                state.edgeThresh = 40;
+                state.mode = 'normal';
+                if (state.originalSrc) overlayImg.src = state.originalSrc;
+                state.drawHistory = [];
+                state.drawHistoryIndex = -1;
+                clearDrawCanvas();
+                centerOverlay();
+                updateOverlay();
+                showToast('🔄 Reset complete');
+            });
+            lockBtn.addEventListener('click', () => {
+                state.locked = !state.locked;
+                updateOverlay();
+                showToast(state.locked ? '🔒 Locked - safe to trace!' : '🔓 Unlocked');
+            });
+            uiBtn.addEventListener('click', () => { state.uiHidden = !state.uiHidden;
+                updateOverlay(); });
+            showUiBtn.addEventListener('click', () => { state.uiHidden = false;
+                updateOverlay(); });
+            fullBtn.addEventListener('click', async () => {
+                try {
+                    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                        showToast('⛶ Fullscreen on');
+                    } else if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                        showToast('⛶ Fullscreen off');
+                    }
+                } catch (_) { showToast('⚠ Fullscreen unavailable'); }
+            });
+            screenshotBtn.addEventListener('click', () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    const ctx = canvas.getContext('2d');
+                    // Draw camera
+                    ctx.drawImage(camera, 0, 0, canvas.width, canvas.height);
+                    // Draw overlay
+                    const owRect = overlayWrap.getBoundingClientRect();
+                    const owW = owRect.width;
+                    const owH = owRect.height;
+                    const owX = owRect.left;
+                    const owY = owRect.top;
+                    ctx.save();
+                    ctx.globalAlpha = state.opacity;
+                    ctx.filter = overlayImg.style.filter || 'none';
+                    ctx.translate(owX + owW / 2, owY + owH / 2);
+                    ctx.rotate(state.rotation * Math.PI / 180);
+                    ctx.scale(state.scale * state.flipX, state.scale);
+                    ctx.drawImage(overlayImg, -state.baseW / 2, -state.baseH / 2, state.baseW, state.baseH);
+                    ctx.restore();
+                    // Draw drawing canvas
+                    const dcRect = drawCanvas.getBoundingClientRect();
+                    ctx.drawImage(drawCanvas, dcRect.left, dcRect.top, dcRect.width, dcRect.height);
+                    // Download
+                    const link = document.createElement('a');
+                    link.download = 'ar-trace-screenshot.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    showToast('📸 Screenshot saved!');
+                } catch (e) {
+                    console.error(e);
+                    showToast('⚠ Screenshot failed');
+                }
+            });
 
-  window.addEventListener('resize', () => {
-    if (overlayImg.src) {
-      state.cx = window.innerWidth / 2;
-      state.cy = window.innerHeight / 2;
-      updateOverlay();
-    }
-  });
+            normalBtn.addEventListener('click', () => {
+                state.mode = 'normal';
+                if (state.originalSrc) overlayImg.src = state.originalSrc;
+                updateOverlay();
+                showToast('📷 Normal mode');
+            });
+            outlineBtn.addEventListener('click', () => {
+                state.mode = 'outline';
+                if (state.outlineSrc) overlayImg.src = state.outlineSrc;
+                else if (state.originalSrc) {
+                    overlayImg.src = state.originalSrc;
+                    showToast('⚠ Outline not ready, rebuilding...');
+                    rebuildOutline();
+                }
+                updateOverlay();
+                showToast('✏ Outline mode');
+            });
+            mirrorBtn.addEventListener('click', () => { state.flipX *= -1;
+                updateOverlay();
+                showToast('⇔ Mirrored'); });
+            rotLBtn.addEventListener('click', () => { state.rotation -= 90;
+                updateOverlay(); });
+            rotRBtn.addEventListener('click', () => { state.rotation += 90;
+                updateOverlay(); });
+            cameraBtn.addEventListener('click', async () => {
+                state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+                saveSettings();
+                await startCamera();
+            });
+            guidesBtn.addEventListener('click', () => { state.guides = !state.guides;
+                updateOverlay(); });
+            gridBtn.addEventListener('click', () => { state.gridVisible = !state.gridVisible;
+                updateOverlay();
+                showToast(state.gridVisible ? '⊞ Grid on' : '⊞ Grid off'); });
 
-  overlayImg.addEventListener('load', () => {
-    if (!state.baseW || !state.baseH) {
-      setImageBaseSize();
-    }
-    updateOverlay();
-  });
+            drawToggleBtn.addEventListener('click', () => {
+                state.drawMode = !state.drawMode;
+                if (state.drawMode) {
+                    state.locked = true;
+                    if (state.drawHistory.length === 0) {
+                        const blank = drawCtx.getImageData(0, 0, drawCanvas.width || state.baseW, drawCanvas
+                            .height || state.baseH);
+                        state.drawHistory.push(blank);
+                        state.drawHistoryIndex = 0;
+                    }
+                }
+                updateOverlay();
+                showToast(state.drawMode ? '✏ Draw mode ON - overlay locked' : '✏ Draw mode OFF');
+            });
+            drawClearBtn.addEventListener('click', () => {
+                clearDrawCanvas();
+                updateOverlay();
+                showToast('🗑 Drawing cleared');
+            });
+            drawUndoBtn.addEventListener('click', undoDraw);
+            drawColor.addEventListener('input', e => { state.drawColor = e.target.value;
+                state.drawEraser = false;
+                updateOverlay(); });
+            drawSize.addEventListener('input', e => { state.drawSize = parseInt(e.target.value);
+                updateOverlay(); });
+            drawEraserBtn.addEventListener('click', () => {
+                state.drawEraser = !state.drawEraser;
+                updateOverlay();
+                showToast(state.drawEraser ? '🧹 Eraser active' : '✏ Pen active');
+            });
 
-  window.addEventListener('beforeunload', () => {
-    stopCamera();
-  });
+            // ──────────────────────────────────────
+            // SLIDER HANDLERS
+            // ──────────────────────────────────────
+            opacityRange.addEventListener('input', e => { state.opacity = parseFloat(e.target.value);
+                updateOverlay(); });
+            scaleRange.addEventListener('input', e => { state.scale = parseFloat(e.target.value);
+                updateOverlay(); });
+            edgeThreshold.addEventListener('input', e => {
+                state.edgeThresh = parseInt(e.target.value);
+                updateOverlay();
+                debouncedRebuildOutline();
+            });
+            brightnessRange.addEventListener('input', e => { state.brightness = parseFloat(e.target.value);
+                updateOverlay(); });
+            contrastRange.addEventListener('input', e => { state.contrast = parseFloat(e.target.value);
+                updateOverlay(); });
+            saturationRange.addEventListener('input', e => { state.saturation = parseFloat(e.target.value);
+                updateOverlay(); });
+            blurRange.addEventListener('input', e => { state.blur = parseFloat(e.target.value);
+                updateOverlay(); });
 
-  function restore() {
-    loadSettings();
+            // ──────────────────────────────────────
+            // KEYBOARD SHORTCUTS
+            // ──────────────────────────────────────
+            window.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+                if (e.target.tagName === 'INPUT' && e.target.type === 'file') return;
+                const key = e.key.toLowerCase();
+                switch (key) {
+                    case 'g':
+                        state.guides = !state.guides;
+                        updateOverlay();
+                        showToast(`Guides: ${state.guides ? 'On' : 'Off'}`);
+                        break;
+                    case 'l':
+                        state.locked = !state.locked;
+                        updateOverlay();
+                        showToast(state.locked ? '🔒 Locked' : '🔓 Unlocked');
+                        break;
+                    case 'd':
+                        if (!e.ctrlKey && !e.metaKey) {
+                            state.drawMode = !state.drawMode;
+                            if (state.drawMode) state.locked = true;
+                            updateOverlay();
+                            showToast(state.drawMode ? '✏ Draw mode ON' : '✏ Draw mode OFF');
+                        }
+                        break;
+                    case 'f':
+                        if (!e.ctrlKey && !e.metaKey) {
+                            if (overlayImg.src) { setImageBaseSize();
+                                updateOverlay();
+                                showToast('📐 Fit'); }
+                        }
+                        break;
+                    case 'r':
+                        if (!e.ctrlKey && !e.metaKey) {
+                            resetBtn.click();
+                        }
+                        break;
+                    case 'o':
+                        if (!e.ctrlKey && !e.metaKey) {
+                            state.mode = state.mode === 'outline' ? 'normal' : 'outline';
+                            if (state.mode === 'outline' && state.outlineSrc) overlayImg.src = state.outlineSrc;
+                            else if (state.mode === 'normal' && state.originalSrc) overlayImg.src = state.originalSrc;
+                            updateOverlay();
+                            showToast(state.mode === 'outline' ? 'Outline mode' : 'Normal mode');
+                        }
+                        break;
+                    case 'm':
+                        state.flipX *= -1;
+                        updateOverlay();
+                        showToast('⇔ Mirrored');
+                        break;
+                    case 'arrowleft':
+                        state.cx -= 5;
+                        updateOverlay();
+                        break;
+                    case 'arrowright':
+                        state.cx += 5;
+                        updateOverlay();
+                        break;
+                    case 'arrowup':
+                        state.cy -= 5;
+                        updateOverlay();
+                        break;
+                    case 'arrowdown':
+                        state.cy += 5;
+                        updateOverlay();
+                        break;
+                    case '+':
+                    case '=':
+                        state.scale = clamp(state.scale + 0.05, 0.15, 8);
+                        updateOverlay();
+                        break;
+                    case '-':
+                        state.scale = clamp(state.scale - 0.05, 0.15, 8);
+                        updateOverlay();
+                        break;
+                    case '0':
+                        state.scale = 1;
+                        state.rotation = 0;
+                        centerOverlay();
+                        updateOverlay();
+                        showToast('Reset zoom/rotation');
+                        break;
+                    case 'z':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            if (e.shiftKey) {
+                                // Redo not implemented for simplicity
+                            } else {
+                                undoDraw();
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            });
 
-    document.body.classList.toggle('hideUI', state.uiHidden);
-    showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
-    guidesEl.style.display = state.guides ? 'block' : 'none';
+            // ──────────────────────────────────────
+            // RESIZE HANDLER
+            // ──────────────────────────────────────
+            window.addEventListener('resize', () => {
+                if (overlayImg.src) {
+                    state.cx = window.innerWidth / 2;
+                    state.cy = window.innerHeight / 2;
+                    syncDrawCanvas();
+                    updateOverlay();
+                }
+            });
 
-    opacityRange.value = String(state.opacity);
-    scaleRange.value = String(state.scale);
-    brightnessRange.value = String(state.brightness);
-    contrastRange.value = String(state.contrast);
-    saturationRange.value = String(state.saturation);
-    blurRange.value = String(state.blur);
+            // ──────────────────────────────────────
+            // OVERLAY IMAGE LOAD
+            // ──────────────────────────────────────
+            overlayImg.addEventListener('load', () => {
+                if (!state.baseW || !state.baseH) setImageBaseSize();
+                syncDrawCanvas();
+                updateOverlay();
+            });
 
-    updateLabels();
+            // ──────────────────────────────────────
+            // CLEANUP
+            // ──────────────────────────────────────
+            window.addEventListener('beforeunload', () => {
+                stopCamera();
+            });
 
-    if (state.originalSrc) {
-      overlayImg.src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state.originalSrc;
-      starter.style.display = 'none';
-      setStatus('Ready');
-      setImageBaseSize();
-      updateOverlay();
-    }
-  }
+            // ──────────────────────────────────────
+            // INIT
+            // ──────────────────────────────────────
+            function restore() {
+                loadSettings();
+                document.body.classList.toggle('hideUI', state.uiHidden);
+                showUiBtn.style.display = state.uiHidden ? 'inline-flex' : 'none';
+                guidesEl.classList.toggle('visible', state.guides);
+                gridOverlay.classList.toggle('visible', state.gridVisible);
+                drawCanvas.classList.toggle('active', state.drawMode);
+                drawCanvas.style.pointerEvents = state.drawMode ? 'auto' : 'none';
 
-  async function init() {
-    restore();
-    await startCamera();
+                opacityRange.value = String(state.opacity);
+                scaleRange.value = String(state.scale);
+                edgeThreshold.value = String(state.edgeThresh);
+                brightnessRange.value = String(state.brightness);
+                contrastRange.value = String(state.contrast);
+                saturationRange.value = String(state.saturation);
+                blurRange.value = String(state.blur);
+                drawColor.value = state.drawColor;
+                drawSize.value = String(state.drawSize);
 
-    if (!state.originalSrc) {
-      starter.style.display = 'flex';
-      errorMsg.textContent = 'Tap Load Image to start.';
-    }
-  }
+                updateLabels();
+                if (state.originalSrc) {
+                    overlayImg.src = state.mode === 'outline' && state.outlineSrc ? state.outlineSrc : state
+                        .originalSrc;
+                    starter.classList.add('hidden');
+                    setStatus('Ready', true);
+                    setImageBaseSize();
+                    syncDrawCanvas();
+                    updateOverlay();
+                }
+                drawClearBtn.disabled = !state.drawMode;
+                drawUndoBtn.disabled = !state.drawMode || state.drawHistory.length <= 1;
+                if (state.drawHistory.length === 0) {
+                    const blank = drawCtx.getImageData(0, 0, drawCanvas.width || state.baseW, drawCanvas.height || state
+                        .baseH);
+                    state.drawHistory.push(blank);
+                    state.drawHistoryIndex = 0;
+                }
+            }
 
-  init();
-})();
-</script>
+            async function init() {
+                restore();
+                await startCamera();
+                if (!state.originalSrc) {
+                    starter.classList.remove('hidden');
+                    errorMsg.textContent = '👆 Tap "Load Image" to get started.';
+                }
+            }
+
+            init();
+        })();
+    </script>
 </body>
 </html>
