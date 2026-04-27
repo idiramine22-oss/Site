@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>AR Trace</title>
+<style>
+:root{
+  --bg:#080b10;
+  --glass:rgba(10,16,26,.85);
+  --glass2:rgba(255,255,255,.07);
+  --glass3:rgba(255,255,255,.13);
+  --text:#eef2ff;
+  --muted:rgba(238,242,255,.55);
+  --accent:#67d4ff;
+  --accent2:#a78bfa;
+  --green:#34d399;
+  --red:#f87171;
+  --yellow:#fbbf24;
+  --border:rgba(255,255,255,.1);
+  --border-a:rgba(103,212,255,.3);
+  --shadow:0 24px 64px rgba(0,0,0,.55);
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+
+html,body{
+width:100%;height:100%;overflow:hidden;
+background:var(–bg);
+font-family:-apple-system,BlinkMacSystemFont,“SF Pro Text”,“Segoe UI”,Roboto,sans-serif;
+touch-action:none;
+-webkit-user-select:none;user-select:none;
+color:var(–text);
+}
+
+/* ── Stage ── */
+#stage{position:fixed;inset:0;background:#000}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+/* ── Overlay ── */
+#overlayOuter{
+position:absolute;left:0;top:0;
+transform-origin:0 0;
+will-change:transform;
+pointer-events:auto;
+touch-action:none;
+}
+#overlayInner{
+transform-origin:50% 50%;
+will-change:transform;
+position:relative;
+}
+#overlayImg{
+display:block;width:100%;height:auto;
+pointer-events:none;
+-webkit-user-drag:none;
+user-select:none;
+will-change:filter;
+}
+
+/* ── HUD top ── */
+#hud{
+position:fixed;left:12px;right:12px;top:env(safe-area-inset-top,12px);
+margin-top:12px;
+z-index:20;
+display:flex;justify-content:space-between;align-items:center;gap:8px;
+pointer-events:none;
+}
+.chip{
+pointer-events:auto;
+display:inline-flex;align-items:center;gap:6px;
+padding:8px 13px;
+border:1px solid var(–border);border-radius:999px;
+background:var(–glass);
+backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+box-shadow:var(–shadow);
+font-size:12.5px;font-weight:600;letter-spacing:.2px;
+white-space:nowrap;
+}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;
+transition:background .4s,box-shadow .4s;}
+.dot.green{background:var(–green);box-shadow:0 0 7px var(–green)}
+.dot.yellow{background:var(–yellow);box-shadow:0 0 7px var(–yellow)}
+.dot.red{background:var(–red);box-shadow:0 0 7px var(–red)}
+
+/* ── Panel toggle ── */
+#panelToggle{
+position:fixed;right:14px;z-index:22;
+width:42px;height:42px;border-radius:50%;
+background:var(–glass);border:1px solid var(–border);
+backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+box-shadow:var(–shadow);
+display:flex;align-items:center;justify-content:center;
+cursor:pointer;font-size:18px;
+transition:opacity .25s;
+}
+
+/* ── Bottom panel ── */
+#bottomPanel{
+position:fixed;left:12px;right:12px;
+bottom:env(safe-area-inset-bottom,0px);
+margin-bottom:12px;
+z-index:20;
+border:1px solid var(–border);border-radius:24px;
+background:var(–glass);
+backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+box-shadow:var(–shadow);
+transition:transform .38s cubic-bezier(.4,0,.2,1),opacity .3s;
+overflow:hidden;
+}
+#bottomPanel.hidden{
+transform:translateY(calc(100% + 20px));
+opacity:0;pointer-events:none;
+}
+#panelInner{padding:14px}
+
+/* ── Tabs ── */
+#tabs{
+display:flex;gap:3px;margin-bottom:13px;
+background:var(–glass2);border-radius:13px;padding:3px;
+}
+.tab{
+flex:1;text-align:center;
+padding:8px 4px;border-radius:10px;
+font-size:11.5px;font-weight:700;cursor:pointer;
+color:var(–muted);letter-spacing:.3px;
+transition:background .2s,color .2s;
+}
+.tab.active{background:var(–glass3);color:var(–text)}
+.tabContent{display:none}
+.tabContent.active{display:block}
+
+/* ── Rows / buttons ── */
+.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+
+.btn{
+appearance:none;
+border:1px solid var(–border);
+background:var(–glass2);
+color:var(–text);
+border-radius:12px;
+padding:9px 12px;
+font-size:12.5px;font-weight:700;
+cursor:pointer;white-space:nowrap;
+display:inline-flex;align-items:center;gap:5px;
+transition:background .15s,transform .1s,border-color .15s,color .15s;
+line-height:1;
+}
+.btn:active{transform:scale(.95)}
+.btn.active{
+background:rgba(103,212,255,.15);
+border-color:var(–border-a);color:var(–accent);
+}
+.btn.danger{color:var(–red)}
+.btn.locked{
+background:rgba(167,139,250,.15);
+border-color:rgba(167,139,250,.4);color:var(–accent2);
+}
+
+.fileBtn{
+border-color:var(–border-a);
+background:rgba(103,212,255,.1);
+color:var(–accent);
+position:relative;overflow:hidden;
+}
+.fileBtn input{
+position:absolute;inset:0;opacity:0;
+width:100%;height:100%;cursor:pointer;
+}
+
+/* ── Sliders ── */
+.sliderRow{
+display:flex;align-items:center;gap:10px;margin-top:10px;
+}
+.sliderLabel{
+min-width:60px;font-size:11.5px;
+color:var(–muted);text-align:right;
+}
+.sliderVal{
+min-width:38px;font-size:11.5px;
+color:var(–accent);text-align:left;font-weight:700;
+font-variant-numeric:tabular-nums;
+}
+input[type=range]{
+flex:1;accent-color:var(–accent);
+height:20px;cursor:pointer;
+}
+
+/* ── Filter pills ── */
+.filterGrid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:6px;margin-top:2px;
+}
+.fPill{
+padding:9px 6px;
+border:1px solid var(–border);border-radius:11px;
+font-size:11.5px;font-weight:700;cursor:pointer;
+color:var(–muted);background:var(–glass2);
+text-align:center;
+transition:all .2s;
+}
+.fPill.active{
+border-color:rgba(167,139,250,.5);
+color:var(–accent2);
+background:rgba(167,139,250,.14);
+}
+
+.hint{
+margin-top:10px;
+font-size:11px;color:var(–muted);line-height:1.6;
+}
+
+/* ── Lock toast ── */
+#lockToast{
+position:fixed;top:50%;left:50%;
+transform:translate(-50%,-50%) scale(.9);
+z-index:30;
+padding:13px 22px;
+border:1px solid var(–border-a);border-radius:16px;
+background:var(–glass);
+backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+font-size:14px;font-weight:700;color:var(–accent2);
+pointer-events:none;
+opacity:0;
+transition:opacity .25s,transform .25s;
+}
+#lockToast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ── Loader ── */
+#loader{
+position:fixed;inset:0;z-index:50;
+display:flex;align-items:center;justify-content:center;
+background:radial-gradient(ellipse at 50% 40%,rgba(15,25,45,.97),rgba(5,8,14,.99));
+}
+#loaderBox{
+text-align:center;max-width:300px;width:90%;
+padding:32px 24px;
+border:1px solid var(–border);border-radius:26px;
+background:var(–glass);
+backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+box-shadow:var(–shadow);
+}
+#loaderBox h1{
+font-size:28px;font-weight:900;letter-spacing:-1px;
+background:linear-gradient(135deg,var(–accent),var(–accent2));
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+background-clip:text;
+margin-bottom:10px;
+}
+#loaderBox p{
+color:var(–muted);font-size:13.5px;line-height:1.65;
+margin-bottom:22px;
+}
+#startBtn{
+display:inline-flex;align-items:center;gap:8px;
+padding:13px 28px;border-radius:14px;
+background:linear-gradient(135deg,var(–accent),var(–accent2));
+color:#050810;font-weight:800;font-size:14.5px;
+cursor:pointer;border:none;
+box-shadow:0 8px 28px rgba(103,212,255,.28);
+transition:opacity .2s,transform .1s;
+}
+#startBtn:active{opacity:.85;transform:scale(.97)}
+#errorMsg{
+margin-top:14px;color:var(–red);font-size:12.5px;line-height:1.5;
+}
+</style>
+
+</head>
+<body>
+
+<!-- Loader -->
+
+<div id="loader">
+  <div id="loaderBox">
+    <h1>AR Trace</h1>
+    <p>ضع صورتك فوق الكاميرا وتتبّعها يدوياً بدقة. يعمل عبر HTTPS فقط.</p>
+    <button id="startBtn">📷 تشغيل الكاميرا</button>
+    <div id="errorMsg"></div>
+  </div>
+</div>
+
+<!-- Stage -->
+
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="overlayOuter">
+    <div id="overlayInner">
+      <img id="overlayImg" alt=""/>
+    </div>
+  </div>
+</div>
+
+<!-- Lock toast -->
+
+<div id="lockToast"></div>
+
+<!-- HUD -->
+
+<div id="hud">
+  <div class="chip">
+    <div class="dot yellow" id="camDot"></div>
+    <span id="camLabel">الكاميرا</span>
+  </div>
+  <div class="chip">
+    <span id="statusText">جاهز</span>
+  </div>
+</div>
+
+<!-- Panel toggle -->
+
+<div id="panelToggle" title="إخفاء/إظهار">⚙️</div>
+
+<!-- Bottom panel -->
+
+<div id="bottomPanel">
+  <div id="panelInner">
+
+```
+<div id="tabs">
+  <div class="tab active" data-tab="image">الصورة</div>
+  <div class="tab" data-tab="adjust">الضبط</div>
+  <div class="tab" data-tab="filter">الفلاتر</div>
+</div>
+
+<!-- Tab: image -->
+<div class="tabContent active" id="tab-image">
+  <div class="row">
+    <label class="btn fileBtn">
+      📂 اختر صورة
+      <input id="fileInput" type="file" accept="image/*"/>
+    </label>
+    <button class="btn" id="fitBtn">⟲ ملاءمة</button>
+    <button class="btn" id="flipBtn">↔ عكس</button>
+    <button class="btn" id="lockBtn">🔓 تثبيت</button>
+    <button class="btn danger" id="resetBtn">✕ إعادة</button>
+  </div>
+  <div class="hint">
+    اسحب بإصبع واحد للتحريك &nbsp;•&nbsp; إصبعان للتكبير والتدوير
+  </div>
+</div>
+
+<!-- Tab: adjust -->
+<div class="tabContent" id="tab-adjust">
+  <div class="sliderRow">
+    <div class="sliderLabel">الشفافية</div>
+    <input id="opacityR" type="range" min="0" max="1" step=".01" value=".55"/>
+    <div class="sliderVal" id="opacityV">55%</div>
+  </div>
+  <div class="sliderRow">
+    <div class="sliderLabel">الحجم</div>
+    <input id="sizeR" type="range" min="80" max="1400" step="1" value="320"/>
+    <div class="sliderVal" id="sizeV">320</div>
+  </div>
+  <div class="sliderRow">
+    <div class="sliderLabel">الدوران</div>
+    <input id="rotR" type="range" min="-180" max="180" step="1" value="0"/>
+    <div class="sliderVal" id="rotV">0°</div>
+  </div>
+  <div class="sliderRow">
+    <div class="sliderLabel">السطوع</div>
+    <input id="brightR" type="range" min=".2" max="2.5" step=".05" value="1"/>
+    <div class="sliderVal" id="brightV">100%</div>
+  </div>
+  <div class="sliderRow">
+    <div class="sliderLabel">التباين</div>
+    <input id="contrastR" type="range" min=".2" max="2.5" step=".05" value="1"/>
+    <div class="sliderVal" id="contrastV">100%</div>
+  </div>
+</div>
+
+<!-- Tab: filter -->
+<div class="tabContent" id="tab-filter">
+  <div class="filterGrid" id="filterGrid">
+    <div class="fPill active" data-f="none">بدون</div>
+    <div class="fPill" data-f="grayscale">رمادي</div>
+    <div class="fPill" data-f="invert">معكوس</div>
+    <div class="fPill" data-f="sepia">كلاسيك</div>
+    <div class="fPill" data-f="edge">حواف</div>
+    <div class="fPill" data-f="hue">ألوان</div>
+  </div>
+  <div class="sliderRow" style="margin-top:12px">
+    <div class="sliderLabel">شدّة الفلتر</div>
+    <input id="fAmtR" type="range" min="0" max="100" step="1" value="100"/>
+    <div class="sliderVal" id="fAmtV">100%</div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ─── Elements ─── */
+const $=id=>document.getElementById(id);
+const camera=$('camera'), overlayOuter=$('overlayOuter'),
+      overlayInner=$('overlayInner'), overlayImg=$('overlayImg'),
+      fileInput=$('fileInput'), loader=$('loader'), errorMsg=$('errorMsg'),
+      camDot=$('camDot'), camLabel=$('camLabel'), statusText=$('statusText'),
+      startBtn=$('startBtn'), lockToast=$('lockToast'),
+      fitBtn=$('fitBtn'), flipBtn=$('flipBtn'), lockBtn=$('lockBtn'), resetBtn=$('resetBtn'),
+      panelToggle=$('panelToggle'), bottomPanel=$('bottomPanel'),
+      opacityR=$('opacityR'), sizeR=$('sizeR'), rotR=$('rotR'),
+      brightR=$('brightR'), contrastR=$('contrastR'), fAmtR=$('fAmtR'),
+      opacityV=$('opacityV'), sizeV=$('sizeV'), rotV=$('rotV'),
+      brightV=$('brightV'), contrastV=$('contrastV'), fAmtV=$('fAmtV');
+
+/* ─── State ─── */
+const S = {
+  cx: window.innerWidth/2,   // image center X
+  cy: window.innerHeight/2,  // image center Y
+  scale: 1,
+  rotation: 0,               // degrees
+  baseW: 320,
+  baseH: 320,
+  opacity: 0.55,
+  brightness: 1,
+  contrast: 1,
+  flipH: false,
+  locked: false,
+  filter: 'none',
+  filterAmt: 1,
+  hasImage: false,
+};
+
+/* ─── RAF render ─── */
+let raf = null;
+function schedRender(){ if(!raf) raf=requestAnimationFrame(doRender); }
+
+function doRender(){
+  raf = null;
+  const {cx,cy,scale,rotation,baseW,baseH,opacity,brightness,contrast,flipH,filter,filterAmt}=S;
+  const tx = cx - baseW/2;
+  const ty = cy - baseH/2;
+
+  overlayOuter.style.transform = `translate(${tx}px,${ty}px)`;
+  overlayOuter.style.opacity = opacity;
+  overlayInner.style.width = baseW+'px';
+  overlayInner.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
+
+  // flip + base filter
+  let fStr = `brightness(${brightness}) contrast(${contrast})`;
+  if(flipH) fStr += ' scaleX(-1)'; // applied via img transform below
+  overlayImg.style.transform = flipH ? 'scaleX(-1)' : 'none';
+
+  let extra = '';
+  if(filter==='grayscale') extra=`grayscale(${filterAmt})`;
+  else if(filter==='invert') extra=`invert(${filterAmt})`;
+  else if(filter==='sepia')  extra=`sepia(${filterAmt})`;
+  else if(filter==='hue')    extra=`hue-rotate(${Math.round(filterAmt*360)}deg)`;
+  else if(filter==='edge')   extra=`contrast(${1+filterAmt*9}) grayscale(1)`;
+
+  overlayImg.style.filter = `brightness(${brightness}) contrast(${contrast})${extra?' '+extra:''}`;
+}
+
+function setS(partial){ Object.assign(S,partial); schedRender(); }
+
+/* ─── Status / UI helpers ─── */
+function status(t){ statusText.textContent=t; }
+
+function showToast(msg){
+  lockToast.textContent=msg;
+  lockToast.classList.add('show');
+  clearTimeout(lockToast._t);
+  lockToast._t=setTimeout(()=>lockToast.classList.remove('show'),1300);
+}
+
+/* ─── Tabs ─── */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tabContent').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+  });
+});
+
+/* ─── Panel toggle ─── */
+let panelVisible = true;
+// Position toggle above panel
+function positionToggle(){
+  const ph = bottomPanel.offsetHeight;
+  const bottom = panelVisible ? ph + 20 : 14;
+  panelToggle.style.bottom = bottom+'px';
+}
+panelToggle.addEventListener('click',()=>{
+  panelVisible=!panelVisible;
+  bottomPanel.classList.toggle('hidden',!panelVisible);
+  panelToggle.textContent = panelVisible ? '⚙️' : '☰';
+  setTimeout(positionToggle,50);
+});
+window.addEventListener('resize', positionToggle);
+setTimeout(positionToggle,100);
+
+/* ─── Camera ─── */
+startBtn.addEventListener('click', startCamera);
+
+async function startCamera(){
+  camDot.className='dot yellow';
+  camLabel.textContent='جاري…';
+  errorMsg.textContent='';
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error('not supported');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+      audio:false
+    });
+    camera.srcObject=stream;
+    await camera.play();
+    loader.style.display='none';
+    camDot.className='dot green';
+    camLabel.textContent='الكاميرا شغالة';
+    status('جاهز');
+  } catch(e){
+    camDot.className='dot red';
+    camLabel.textContent='خطأ';
+    errorMsg.textContent='تعذّر تشغيل الكاميرا. تأكد من HTTPS والإذن بالكاميرا.';
+    console.error(e);
+  }
+}
+
+/* ─── File load ─── */
+fileInput.addEventListener('change',e=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  overlayImg.src=URL.createObjectURL(file);
+  status('جاري التحميل…');
+});
+
+overlayImg.addEventListener('load',()=>{
+  if(!overlayImg.naturalWidth) return;
+  const ratio=overlayImg.naturalHeight/overlayImg.naturalWidth;
+  const w=Math.min(window.innerWidth*.72,420);
+  setS({
+    baseW:w, baseH:w*ratio,
+    scale:1, rotation:0,
+    cx:window.innerWidth/2, cy:window.innerHeight/2,
+    hasImage:true,
+  });
+  sizeR.value=Math.round(w); sizeV.textContent=Math.round(w);
+  rotR.value='0'; rotV.textContent='0°';
+  status('تم التحميل ✓');
+});
+
+/* ─── Fit ─── */
+fitBtn.addEventListener('click',()=>{
+  if(!S.hasImage) return;
+  const ratio=overlayImg.naturalHeight/overlayImg.naturalWidth;
+  const t=Math.min(window.innerWidth*.78,window.innerHeight*.65);
+  setS({baseW:t,baseH:t*ratio,scale:1,rotation:0,cx:window.innerWidth/2,cy:window.innerHeight/2});
+  sizeR.value=Math.round(t); sizeV.textContent=Math.round(t);
+  rotR.value='0'; rotV.textContent='0°';
+  status('ملاءمة ✓');
+});
+
+/* ─── Flip ─── */
+flipBtn.addEventListener('click',()=>{
+  setS({flipH:!S.flipH});
+  flipBtn.classList.toggle('active',S.flipH);
+  status(S.flipH?'معكوس':'عادي');
+});
+
+/* ─── Lock ─── */
+lockBtn.addEventListener('click',()=>{
+  S.locked=!S.locked;
+  lockBtn.textContent=S.locked?'🔒 محرَّر':'🔓 تثبيت';
+  lockBtn.className='btn'+(S.locked?' locked':'');
+  showToast(S.locked?'🔒 الصورة مثبّتة':'🔓 الصورة حرّة');
+  status(S.locked?'مثبّت':'حر');
+});
+
+/* ─── Reset ─── */
+resetBtn.addEventListener('click',()=>{
+  setS({scale:1,rotation:0,flipH:false,cx:window.innerWidth/2,cy:window.innerHeight/2});
+  rotR.value='0'; rotV.textContent='0°';
+  flipBtn.classList.remove('active');
+  status('إعادة ✓');
+});
+
+/* ─── Sliders ─── */
+opacityR.addEventListener('input',e=>{
+  const v=parseFloat(e.target.value);
+  opacityV.textContent=Math.round(v*100)+'%';
+  setS({opacity:v});
+});
+sizeR.addEventListener('input',e=>{
+  const w=parseInt(e.target.value);
+  sizeV.textContent=w;
+  const ratio=S.hasImage&&overlayImg.naturalWidth?overlayImg.naturalHeight/overlayImg.naturalWidth:1;
+  setS({baseW:w,baseH:w*ratio});
+});
+rotR.addEventListener('input',e=>{
+  const d=parseInt(e.target.value);
+  rotV.textContent=d+'°';
+  setS({rotation:d});
+});
+brightR.addEventListener('input',e=>{
+  const v=parseFloat(e.target.value);
+  brightV.textContent=Math.round(v*100)+'%';
+  setS({brightness:v});
+});
+contrastR.addEventListener('input',e=>{
+  const v=parseFloat(e.target.value);
+  contrastV.textContent=Math.round(v*100)+'%';
+  setS({contrast:v});
+});
+fAmtR.addEventListener('input',e=>{
+  const v=parseInt(e.target.value);
+  fAmtV.textContent=v+'%';
+  setS({filterAmt:v/100});
+});
+
+/* ─── Filter pills ─── */
+document.querySelectorAll('.fPill').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('.fPill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    setS({filter:p.dataset.f});
+  });
+});
+
+/* ─── Pointer / Gesture ─── */
+const ptrs = new Map(); // pointerId → {x,y}
+let drag=null, pinch=null;
+
+function getAngle(a,b){ return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI; }
+function getDist(a,b){ return Math.hypot(b.x-a.x,b.y-a.y); }
+function getMid(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; }
+
+overlayOuter.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  overlayOuter.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  if(ptrs.size===1&&!S.locked){
+    drag={id:e.pointerId,sx:e.clientX,sy:e.clientY,ocx:S.cx,ocy:S.cy};
+    status('سحب…');
+  }
+  if(ptrs.size===2&&!S.locked){
+    const [p1,p2]=Array.from(ptrs.values());
+    const mid=getMid(p1,p2);
+    pinch={
+      startDist:getDist(p1,p2),
+      startAngle:getAngle(p1,p2),
+      startScale:S.scale,
+      startRotation:S.rotation,
+      startCx:S.cx, startCy:S.cy,
+      mid,
+    };
+    drag=null;
+    status('تكبير/تدوير…');
+  }
+},{passive:false});
+
+overlayOuter.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)) return;
+  e.preventDefault();
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(S.locked) return;
+
+  if(ptrs.size===1&&drag){
+    setS({
+      cx: drag.ocx + (e.clientX - drag.sx),
+      cy: drag.ocy + (e.clientY - drag.sy),
+    });
+  }
+
+  if(ptrs.size===2&&pinch){
+    const [p1,p2]=Array.from(ptrs.values());
+    const dist=getDist(p1,p2);
+    const angle=getAngle(p1,p2);
+    const mid=getMid(p1,p2);
+    const f=dist/pinch.startDist;
+    const newScale=Math.max(.08,Math.min(10,pinch.startScale*f));
+    const newRotation=pinch.startRotation+(angle-pinch.startAngle);
+    // zoom toward pinch center + pan with finger midpoint shift
+    const newCx=pinch.mid.x+(pinch.startCx-pinch.mid.x)*f+(mid.x-pinch.mid.x);
+    const newCy=pinch.mid.y+(pinch.startCy-pinch.mid.y)*f+(mid.y-pinch.mid.y);
+    setS({scale:newScale,rotation:newRotation,cx:newCx,cy:newCy});
+    // sync rotation slider
+    const clampedRot=((newRotation%360)+360)%360;
+    const displayRot=clampedRot>180?clampedRot-360:clampedRot;
+    rotR.value=Math.round(displayRot);
+    rotV.textContent=Math.round(displayRot)+'°';
+  }
+},{passive:false});
+
+function onEnd(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size===0){
+    drag=null; pinch=null;
+    if(!S.locked) status('جاهز');
+  } else if(ptrs.size===1){
+    const [id,pos]=Array.from(ptrs.entries())[0];
+    drag={id,sx:pos.x,sy:pos.y,ocx:S.cx,ocy:S.cy};
+    pinch=null;
+    if(!S.locked) status('سحب…');
+  }
+}
+overlayOuter.addEventListener('pointerup',onEnd);
+overlayOuter.addEventListener('pointercancel',onEnd);
+overlayOuter.addEventListener('pointerleave',onEnd);
+
+/* ─── Resize ─── */
+window.addEventListener('resize',()=>{ if(S.hasImage) setS({cx:window.innerWidth/2,cy:window.innerHeight/2}); });
+
+/* ─── Init ─── */
+schedRender();
+})();
+</script>
+
+</body>
+</html>
