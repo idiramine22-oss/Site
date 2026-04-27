@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<title>AR Trace</title>
+<style>
+:root{
+  --bg:#06090f;
+  --glass:rgba(8,13,22,.92);
+  --g2:rgba(255,255,255,.07);
+  --g3:rgba(255,255,255,.14);
+  --text:#e8eeff;
+  --muted:rgba(232,238,255,.5);
+  --accent:#58c5f5;
+  --a2:#9d7eff;
+  --green:#2fd6a0;
+  --red:#f06b6b;
+  --yellow:#f5bc50;
+  --border:rgba(255,255,255,.1);
+  --ba:rgba(88,197,245,.28);
+  --shadow:0 20px 60px rgba(0,0,0,.65);
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;height:100%;overflow:hidden;
+  background:var(--bg);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+  touch-action:none;-webkit-user-select:none;user-select:none;
+  color:var(--text);
+}
+
+/* ── Stage ── */
+#stage{position:fixed;inset:0;background:#000}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#gridSvg{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+
+/* ── Overlay ── */
+#overlayOuter{
+  position:absolute;left:0;top:0;
+  transform-origin:0 0;will-change:transform;
+  pointer-events:auto;touch-action:none;
+}
+#overlayInner{transform-origin:50% 50%;will-change:transform}
+#overlayImg{display:block;width:100%;height:auto;pointer-events:none;-webkit-user-drag:none}
+
+/* ── HUD ── */
+#hud{
+  position:fixed;left:12px;right:60px;
+  top:calc(var(--sat) + 12px);
+  z-index:20;
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  pointer-events:none;
+}
+.chip{
+  pointer-events:auto;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 11px;
+  border:1px solid var(--border);border-radius:999px;
+  background:var(--glass);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:var(--shadow);
+  font-size:11.5px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
+}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .4s,box-shadow .4s}
+.dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+
+/* ── Sidebar ── */
+#sidebar{
+  position:fixed;right:12px;z-index:22;
+  display:flex;flex-direction:column-reverse;gap:7px;
+  bottom:calc(var(--sab) + 12px);
+}
+.iconBtn{
+  width:40px;height:40px;border-radius:50%;
+  border:1px solid var(--border);background:var(--glass);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:15px;
+  transition:background .15s,border-color .15s,transform .1s,opacity .25s;
+  flex-shrink:0;
+}
+.iconBtn:active{transform:scale(.88)}
+.iconBtn.on{background:rgba(88,197,245,.18);border-color:rgba(88,197,245,.4)}
+.iconBtn.dim{opacity:.28;pointer-events:none}
+
+/* ── Bottom Panel ── */
+#bottomPanel{
+  position:fixed;left:12px;right:60px;
+  bottom:calc(var(--sab) + 12px);
+  z-index:20;
+  border:1px solid var(--border);border-radius:22px;
+  background:var(--glass);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  box-shadow:var(--shadow);
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .3s;
+  overflow:hidden;
+}
+#bottomPanel.hidden{transform:translateY(calc(100% + 24px));opacity:0;pointer-events:none}
+#panelInner{padding:12px}
+
+/* ── Tabs ── */
+#tabs{
+  display:flex;gap:3px;margin-bottom:11px;
+  background:var(--g2);border-radius:12px;padding:3px;
+}
+.tab{
+  flex:1;text-align:center;padding:7px 4px;border-radius:9px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  color:var(--muted);transition:background .18s,color .18s;
+}
+.tab.active{background:var(--g3);color:var(--text)}
+.tabContent{display:none}
+.tabContent.active{display:block}
+
+/* ── Buttons ── */
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn{
+  appearance:none;border:1px solid var(--border);background:var(--g2);
+  color:var(--text);border-radius:11px;padding:8px 11px;
+  font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:4px;
+  transition:background .15s,transform .1s,border-color .15s,color .15s;line-height:1;
+}
+.btn:active{transform:scale(.93)}
+.btn.active{background:rgba(88,197,245,.15);border-color:var(--ba);color:var(--accent)}
+.btn.danger{color:var(--red)}
+.btn.locked{background:rgba(157,126,255,.15);border-color:rgba(157,126,255,.4);color:var(--a2)}
+.fileBtn{border-color:var(--ba);background:rgba(88,197,245,.1);color:var(--accent);position:relative;overflow:hidden}
+.fileBtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+
+/* ── Thumbnail ── */
+#thumbWrap{
+  width:42px;height:42px;border-radius:9px;border:1px solid var(--border);
+  overflow:hidden;flex-shrink:0;background:var(--g2);
+  display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted);
+}
+#thumbImg{width:100%;height:100%;object-fit:cover;display:none}
+
+/* ── Sliders ── */
+.sliderRow{display:flex;align-items:center;gap:8px;margin-top:9px}
+.sLbl{min-width:52px;font-size:10.5px;color:var(--muted);text-align:right}
+.sVal{min-width:36px;font-size:10.5px;color:var(--accent);font-weight:700;text-align:left;font-variant-numeric:tabular-nums}
+input[type=range]{flex:1;accent-color:var(--accent);height:20px;cursor:pointer}
+
+/* ── Filter pills ── */
+.fGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.fPill{
+  padding:8px 4px;border:1px solid var(--border);border-radius:10px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  color:var(--muted);background:var(--g2);text-align:center;transition:all .18s;
+}
+.fPill.active{border-color:rgba(157,126,255,.5);color:var(--a2);background:rgba(157,126,255,.14)}
+
+/* ── Snap ring ── */
+#snapRing{
+  position:fixed;top:50%;left:50%;z-index:25;pointer-events:none;
+  width:56px;height:56px;margin:-28px 0 0 -28px;
+  border-radius:50%;border:2px solid var(--accent);
+  box-shadow:0 0 18px var(--accent);
+  opacity:0;transform:scale(1.5);
+  transition:opacity .15s,transform .15s;
+}
+#snapRing.show{opacity:1;transform:scale(1)}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;top:50%;left:50%;z-index:35;
+  transform:translate(-50%,-50%) scale(.88);
+  padding:10px 18px;border-radius:14px;
+  background:var(--glass);border:1px solid var(--ba);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  font-size:12.5px;font-weight:700;color:var(--text);
+  pointer-events:none;opacity:0;white-space:nowrap;
+  transition:opacity .2s,transform .2s;
+}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ── Flash ── */
+#flash{position:fixed;inset:0;z-index:40;background:#fff;pointer-events:none;opacity:0;transition:opacity .12s}
+
+/* ── Hint ── */
+.hint{margin-top:8px;font-size:10px;color:var(--muted);line-height:1.65}
+
+/* ── Loader ── */
+#loader{
+  position:fixed;inset:0;z-index:50;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%,rgba(12,20,40,.97),rgba(4,6,12,.99));
+}
+#loaderBox{
+  text-align:center;max-width:300px;width:90%;padding:32px 24px;
+  border:1px solid var(--border);border-radius:26px;
+  background:var(--glass);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  box-shadow:var(--shadow);
+}
+#loaderBox h1{
+  font-size:28px;font-weight:900;letter-spacing:-1.2px;margin-bottom:8px;
+  background:linear-gradient(135deg,var(--accent),var(--a2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+#loaderBox p{color:var(--muted);font-size:13px;line-height:1.65;margin-bottom:20px}
+#startBtn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:12px 26px;border-radius:13px;
+  background:linear-gradient(135deg,var(--accent),var(--a2));
+  color:#040810;font-weight:800;font-size:13.5px;
+  cursor:pointer;border:none;box-shadow:0 8px 28px rgba(88,197,245,.25);
+  transition:opacity .2s,transform .1s;
+}
+#startBtn:active{opacity:.85;transform:scale(.97)}
+#errorMsg{margin-top:14px;color:var(--red);font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div id="loaderBox">
+    <h1>AR Trace</h1>
+    <p>ضع الصورة فوق الكاميرا وتتبّعها يدوياً بدقة احترافية.</p>
+    <button id="startBtn">📷 تشغيل الكاميرا</button>
+    <div id="errorMsg"></div>
+  </div>
+</div>
+
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+  <svg id="gridSvg"></svg>
+  <div id="overlayOuter">
+    <div id="overlayInner">
+      <img id="overlayImg" alt=""/>
+    </div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="snapRing"></div>
+<div id="toast"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="chip"><div class="dot yellow" id="camDot"></div><span id="camLabel">كاميرا</span></div>
+  <div class="chip" id="rotChip" style="display:none"><span id="rotBadge">0°</span></div>
+  <div class="chip"><span id="statusText">جاهز</span></div>
+</div>
+
+<!-- Sidebar (column-reverse: first child = bottom) -->
+<div id="sidebar">
+  <div class="iconBtn" id="panelToggleBtn" title="اللوحة">⚙️</div>
+  <div class="iconBtn dim" id="undoBtn"  title="تراجع (Ctrl+Z)">↩</div>
+  <div class="iconBtn dim" id="redoBtn"  title="إعادة">↪</div>
+  <div class="iconBtn"     id="gridBtn"  title="شبكة (G)">⊞</div>
+  <div class="iconBtn"     id="ssBtn"    title="لقطة (Ctrl+S)">📸</div>
+  <div class="iconBtn"     id="camSwBtn" title="قلب الكاميرا">🔄</div>
+</div>
+
+<!-- Panel -->
+<div id="bottomPanel">
+  <div id="panelInner">
+    <div id="tabs">
+      <div class="tab active" data-tab="image">الصورة</div>
+      <div class="tab" data-tab="adjust">الضبط</div>
+      <div class="tab" data-tab="filter">الفلاتر</div>
+    </div>
+
+    <div class="tabContent active" id="tab-image">
+      <div class="row">
+        <div id="thumbWrap"><span id="thumbPh">🖼</span><img id="thumbImg" alt=""/></div>
+        <label class="btn fileBtn">📂 صورة<input id="fileInput" type="file" accept="image/*"/></label>
+        <button class="btn" id="fitBtn">⟲ ملاءمة</button>
+        <button class="btn" id="rot90Btn">↻ 90°</button>
+        <button class="btn" id="flipBtn">↔ عكس</button>
+        <button class="btn" id="centerBtn">⊕ وسّط</button>
+        <button class="btn" id="lockBtn">🔓 تثبيت</button>
+        <button class="btn danger" id="resetBtn">✕ إعادة</button>
+      </div>
+      <div class="hint">اسحب بإصبع • إصبعان للتكبير والتدوير • انقر مرتين لنظرة سريعة 👁</div>
+    </div>
+
+    <div class="tabContent" id="tab-adjust">
+      <div class="sliderRow"><div class="sLbl">الشفافية</div><input id="opR" type="range" min="0" max="1" step=".01" value=".55"/><div class="sVal" id="opV">55%</div></div>
+      <div class="sliderRow"><div class="sLbl">الحجم</div><input id="szR" type="range" min="80" max="1400" step="1" value="320"/><div class="sVal" id="szV">320</div></div>
+      <div class="sliderRow"><div class="sLbl">الدوران</div><input id="rotR" type="range" min="-180" max="180" step="1" value="0"/><div class="sVal" id="rotV">0°</div></div>
+      <div class="sliderRow"><div class="sLbl">السطوع</div><input id="brR" type="range" min=".2" max="2.5" step=".05" value="1"/><div class="sVal" id="brV">100%</div></div>
+      <div class="sliderRow"><div class="sLbl">التباين</div><input id="coR" type="range" min=".2" max="2.5" step=".05" value="1"/><div class="sVal" id="coV">100%</div></div>
+    </div>
+
+    <div class="tabContent" id="tab-filter">
+      <div class="fGrid">
+        <div class="fPill active" data-f="none">بدون</div>
+        <div class="fPill" data-f="grayscale">رمادي</div>
+        <div class="fPill" data-f="invert">معكوس</div>
+        <div class="fPill" data-f="sepia">كلاسيك</div>
+        <div class="fPill" data-f="hue">ألوان</div>
+        <div class="fPill" data-f="edge">تعزيز</div>
+      </div>
+      <div class="sliderRow" style="margin-top:10px">
+        <div class="sLbl">الشدّة</div>
+        <input id="faR" type="range" min="0" max="100" step="1" value="100"/>
+        <div class="sVal" id="faV">100%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ── Elements ── */
+const camera=$('camera'), overlayOuter=$('overlayOuter'), overlayInner=$('overlayInner'),
+      overlayImg=$('overlayImg'), fileInput=$('fileInput'),
+      loader=$('loader'), errorMsg=$('errorMsg'), startBtn=$('startBtn'),
+      camDot=$('camDot'), camLabel=$('camLabel'), statusText=$('statusText'),
+      rotChip=$('rotChip'), rotBadge=$('rotBadge'),
+      flash=$('flash'), snapRing=$('snapRing'), toast=$('toast'), gridSvg=$('gridSvg'),
+      thumbImg=$('thumbImg'), thumbPh=$('thumbPh'),
+      fitBtn=$('fitBtn'), flipBtn=$('flipBtn'), lockBtn=$('lockBtn'),
+      resetBtn=$('resetBtn'), rot90Btn=$('rot90Btn'), centerBtn=$('centerBtn'),
+      panelToggleBtn=$('panelToggleBtn'), bottomPanel=$('bottomPanel'),
+      undoBtn=$('undoBtn'), redoBtn=$('redoBtn'), gridBtn=$('gridBtn'),
+      ssBtn=$('ssBtn'), camSwBtn=$('camSwBtn'),
+      opR=$('opR'), szR=$('szR'), rotR=$('rotR'), brR=$('brR'), coR=$('coR'), faR=$('faR'),
+      opV=$('opV'), szV=$('szV'), rotV=$('rotV'), brV=$('brV'), coV=$('coV'), faV=$('faV');
+
+/* ── State ── */
+const S = {
+  cx: innerWidth/2, cy: innerHeight/2,
+  scale: 1, rotation: 0,
+  baseW: 320, baseH: 320,
+  opacity: 0.55,
+  brightness: 1, contrast: 1,
+  flipH: false, locked: false,
+  filter: 'none', filterAmt: 1,
+  hasImage: false,
+};
+
+// Persist
+try {
+  const sv = JSON.parse(localStorage.getItem('artrace-v3')||'{}');
+  ['opacity','brightness','contrast','filter','filterAmt'].forEach(k=>{if(sv[k]!=null)S[k]=sv[k];});
+} catch(e){}
+const PERSIST = ['opacity','brightness','contrast','filter','filterAmt'];
+function persist(){ try{localStorage.setItem('artrace-v3',JSON.stringify(Object.fromEntries(PERSIST.map(k=>[k,S[k]]))));}catch(e){} }
+
+/* ── Render ── */
+let raf=null;
+function q(){ if(!raf) raf=requestAnimationFrame(render); }
+
+function buildFilter(){
+  let s=`brightness(${S.brightness}) contrast(${S.contrast})`;
+  const a=S.filterAmt;
+  if(S.filter==='grayscale') s+=` grayscale(${a})`;
+  else if(S.filter==='invert') s+=` invert(${a})`;
+  else if(S.filter==='sepia') s+=` sepia(${a})`;
+  else if(S.filter==='hue') s+=` hue-rotate(${Math.round(a*360)}deg)`;
+  else if(S.filter==='edge') s+=` contrast(${1+a*9}) grayscale(1)`;
+  return s;
+}
+
+function render(){
+  raf=null;
+  overlayOuter.style.transform=`translate(${S.cx-S.baseW/2}px,${S.cy-S.baseH/2}px)`;
+  overlayOuter.style.opacity=S.opacity;
+  overlayInner.style.width=S.baseW+'px';
+  overlayInner.style.transform=`scale(${S.scale}) rotate(${S.rotation}deg)`;
+  overlayImg.style.transform=S.flipH?'scaleX(-1)':'none';
+  overlayImg.style.filter=buildFilter();
+}
+
+function set(p){ Object.assign(S,p); q(); }
+
+/* ── History ── */
+const hist=[]; let hIdx=-1;
+const HMAX=30;
+const snap=()=>({cx:S.cx,cy:S.cy,scale:S.scale,rotation:S.rotation,baseW:S.baseW,baseH:S.baseH,flipH:S.flipH});
+function push(){
+  hist.splice(hIdx+1);
+  hist.push(snap());
+  if(hist.length>HMAX) hist.shift();
+  hIdx=hist.length-1;
+  updHist();
+}
+function undo(){ if(hIdx<=0)return; hIdx--; Object.assign(S,hist[hIdx]); q(); syncAll(); updHist(); haptic(15); status('تراجع'); }
+function redo(){ if(hIdx>=hist.length-1)return; hIdx++; Object.assign(S,hist[hIdx]); q(); syncAll(); updHist(); haptic(15); status('إعادة'); }
+function updHist(){
+  undoBtn.classList.toggle('dim',hIdx<=0);
+  redoBtn.classList.toggle('dim',hIdx>=hist.length-1);
+}
+
+/* ── Utils ── */
+function haptic(ms){ try{navigator.vibrate?.(ms);}catch(e){} }
+
+let toastTimer;
+function showToast(msg,col){
+  toast.textContent=msg; toast.style.color=col||'var(--text)';
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toast.classList.remove('show'),1500);
+}
+function status(t){ statusText.textContent=t; }
+
+function normAngle(a){
+  let n=((a%360)+360)%360;
+  if(n>180) n-=360;
+  return Math.round(n);
+}
+
+function imageRatio(){
+  return (S.hasImage&&overlayImg.naturalWidth)?(overlayImg.naturalHeight/overlayImg.naturalWidth):1;
+}
+
+function syncAll(){
+  opR.value=S.opacity; opV.textContent=Math.round(S.opacity*100)+'%';
+  szR.value=Math.round(S.baseW); szV.textContent=Math.round(S.baseW);
+  const r=normAngle(S.rotation);
+  rotR.value=r; rotV.textContent=r+'°'; rotBadge.textContent=r+'°';
+  brR.value=S.brightness; brV.textContent=Math.round(S.brightness*100)+'%';
+  coR.value=S.contrast; coV.textContent=Math.round(S.contrast*100)+'%';
+  flipBtn.classList.toggle('active',S.flipH);
+  lockBtn.textContent=S.locked?'🔒 محرَّر':'🔓 تثبيت';
+  lockBtn.className='btn'+(S.locked?' locked':'');
+}
+
+/* ── Grid ── */
+const GMODES=['none','thirds','cross','grid'];
+let gMode=0;
+function drawGrid(){
+  const m=GMODES[gMode];
+  if(m==='none'){gridSvg.innerHTML='';return;}
+  const W=innerWidth,H=innerHeight;
+  const c='rgba(255,255,255,0.22)',cd='rgba(255,255,255,0.08)';
+  let s='';
+  const hline=(y,col)=>`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${col}" stroke-width="1"/>`;
+  const vline=(x,col)=>`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="${col}" stroke-width="1"/>`;
+
+  if(m==='grid'){
+    for(let i=1;i<10;i++){ s+=vline(W*i/10,cd)+hline(H*i/10,cd); }
+  }
+  if(m==='thirds'||m==='grid'){
+    [1,2].forEach(i=>{ s+=vline(W*i/3,c)+hline(H*i/3,c); });
+  }
+  if(m==='cross'){
+    s+=vline(W/2,c)+hline(H/2,c);
+    s+=`<circle cx="${W/2}" cy="${H/2}" r="48" fill="none" stroke="${c}" stroke-width="1"/>`;
+    s+=`<circle cx="${W/2}" cy="${H/2}" r="3" fill="${c}"/>`;
+  }
+  gridSvg.innerHTML=s;
+}
+gridBtn.addEventListener('click',()=>{
+  gMode=(gMode+1)%GMODES.length;
+  drawGrid();
+  const lbl=['بلا شبكة','أثلاث','تقاطع','شبكة كاملة'];
+  showToast(lbl[gMode]);
+  gridBtn.classList.toggle('on',gMode>0);
+  haptic(20);
+});
+window.addEventListener('resize',drawGrid);
+
+/* ── Tabs ── */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabContent').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('tab-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ── Panel toggle ── */
+let panelVis=true;
+panelToggleBtn.addEventListener('click',()=>{
+  panelVis=!panelVis;
+  bottomPanel.classList.toggle('hidden',!panelVis);
+  panelToggleBtn.textContent=panelVis?'⚙️':'☰';
+  haptic(15);
+});
+
+/* ── Camera ── */
+let facingMode='environment', stream=null;
+startBtn.addEventListener('click',()=>startCamera('environment'));
+
+async function startCamera(facing){
+  facingMode=facing;
+  camDot.className='dot yellow'; camLabel.textContent='جاري…'; errorMsg.textContent='';
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error();
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false
+    });
+    camera.srcObject=stream; await camera.play();
+    loader.style.display='none';
+    camDot.className='dot green'; camLabel.textContent='شغّالة'; status('جاهز');
+  }catch(e){
+    camDot.className='dot red'; camLabel.textContent='خطأ';
+    errorMsg.textContent='تعذّر تشغيل الكاميرا. تأكد من HTTPS والإذن.';
+    loader.style.display='flex';
+  }
+}
+
+camSwBtn.addEventListener('click',()=>{
+  if(!stream) return;
+  const next=facingMode==='environment'?'user':'environment';
+  startCamera(next);
+  showToast(next==='user'?'🤳 أمامية':'📷 خلفية');
+  haptic(20);
+});
+
+/* ── File load ── */
+let lastObjectURL=null;
+fileInput.addEventListener('change',e=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  if(lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+  lastObjectURL=URL.createObjectURL(file);
+  overlayImg.src=lastObjectURL;
+  thumbImg.src=lastObjectURL;
+  status('جاري…');
+});
+overlayImg.addEventListener('load',()=>{
+  if(!overlayImg.naturalWidth) return;
+  const ratio=overlayImg.naturalHeight/overlayImg.naturalWidth;
+  const w=Math.min(innerWidth*.72,420);
+  set({baseW:w,baseH:w*ratio,scale:1,rotation:0,cx:innerWidth/2,cy:innerHeight/2,hasImage:true});
+  thumbImg.style.display='block'; thumbPh.style.display='none';
+  rotChip.style.display=''; rotBadge.textContent='0°';
+  szR.value=Math.round(w); szV.textContent=Math.round(w);
+  rotR.value='0'; rotV.textContent='0°';
+  push(); status('تم ✓');
+});
+
+/* ── Action Buttons ── */
+fitBtn.addEventListener('click',()=>{
+  if(!S.hasImage) return; push();
+  const ratio=imageRatio();
+  const t=Math.min(innerWidth*.8,innerHeight*.65);
+  set({baseW:t,baseH:t*ratio,scale:1,rotation:0,cx:innerWidth/2,cy:innerHeight/2});
+  szR.value=Math.round(t); szV.textContent=Math.round(t);
+  rotR.value='0'; rotV.textContent='0°'; rotBadge.textContent='0°';
+  showToast('⟲ ملاءمة'); haptic(20);
+});
+
+rot90Btn.addEventListener('click',()=>{
+  push();
+  const r=normAngle(S.rotation+90);
+  set({rotation:r}); rotR.value=r; rotV.textContent=r+'°'; rotBadge.textContent=r+'°';
+  haptic(25);
+});
+
+centerBtn.addEventListener('click',()=>{
+  push(); set({cx:innerWidth/2,cy:innerHeight/2}); showToast('⊕ تمركز'); haptic(15);
+});
+
+flipBtn.addEventListener('click',()=>{
+  push(); set({flipH:!S.flipH});
+  flipBtn.classList.toggle('active',S.flipH);
+  showToast(S.flipH?'↔ معكوس':'↔ عادي'); haptic(20);
+});
+
+lockBtn.addEventListener('click',()=>{
+  S.locked=!S.locked;
+  lockBtn.textContent=S.locked?'🔒 محرَّر':'🔓 تثبيت';
+  lockBtn.className='btn'+(S.locked?' locked':'');
+  showToast(S.locked?'🔒 مثبّتة':'🔓 حرّة',S.locked?'var(--a2)':'');
+  haptic(S.locked?[20,10,40]:20);
+});
+
+resetBtn.addEventListener('click',()=>{
+  push(); set({scale:1,rotation:0,flipH:false,cx:innerWidth/2,cy:innerHeight/2});
+  syncAll(); showToast('✕ إعادة ضبط'); haptic(15);
+});
+
+undoBtn.addEventListener('click',undo);
+redoBtn.addEventListener('click',redo);
+
+/* ── Sliders ── */
+opR.addEventListener('input',e=>{ const v=parseFloat(e.target.value); opV.textContent=Math.round(v*100)+'%'; set({opacity:v}); persist(); });
+szR.addEventListener('input',e=>{ const w=parseInt(e.target.value); szV.textContent=w; set({baseW:w,baseH:w*imageRatio()}); });
+rotR.addEventListener('input',e=>{ const d=parseInt(e.target.value); rotV.textContent=d+'°'; rotBadge.textContent=d+'°'; set({rotation:d}); });
+brR.addEventListener('input',e=>{ const v=parseFloat(e.target.value); brV.textContent=Math.round(v*100)+'%'; set({brightness:v}); persist(); });
+coR.addEventListener('input',e=>{ const v=parseFloat(e.target.value); coV.textContent=Math.round(v*100)+'%'; set({contrast:v}); persist(); });
+faR.addEventListener('input',e=>{ const v=parseInt(e.target.value); faV.textContent=v+'%'; set({filterAmt:v/100}); persist(); });
+
+/* ── Filter pills ── */
+document.querySelectorAll('.fPill').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('.fPill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active'); set({filter:p.dataset.f}); persist();
+  });
+});
+// Restore saved filter
+if(S.filter&&S.filter!=='none'){
+  document.querySelector('.fPill[data-f="none"]')?.classList.remove('active');
+  document.querySelector(`.fPill[data-f="${S.filter}"]`)?.classList.add('active');
+}
+
+/* ── Screenshot ── */
+ssBtn.addEventListener('click',async()=>{
+  if(!S.hasImage||!stream) { showToast('ارفع صورة أولاً'); return; }
+  haptic([30,20,80]);
+  flash.style.opacity='1'; setTimeout(()=>flash.style.opacity='0',200);
+
+  const W=innerWidth, H=innerHeight;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+
+  // Camera (letterbox-free crop)
+  const vw=camera.videoWidth||W, vh=camera.videoHeight||H;
+  const vr=vw/vh, sr=W/H;
+  let sx=0,sy=0,sw=vw,sh=vh;
+  if(vr>sr){sw=vh*sr;sx=(vw-sw)/2;}else{sh=vw/sr;sy=(vh-sh)/2;}
+  ctx.drawImage(camera,sx,sy,sw,sh,0,0,W,H);
+
+  // Overlay with matching transforms
+  ctx.save();
+  ctx.globalAlpha=S.opacity;
+  ctx.filter=buildFilter();
+  ctx.translate(S.cx,S.cy);
+  ctx.scale(S.scale,S.scale);
+  ctx.rotate(S.rotation*Math.PI/180);
+  if(S.flipH) ctx.scale(-1,1);
+  ctx.drawImage(overlayImg,-S.baseW/2,-S.baseH/2,S.baseW,S.baseH);
+  ctx.restore();
+
+  canvas.toBlob(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`artrace-${Date.now()}.jpg`;
+    a.click();
+    showToast('📸 تم حفظ اللقطة');
+  },'image/jpeg',.92);
+});
+
+/* ── Angle snapping ── */
+const SNAPS=[0,30,45,60,90,120,135,150,180,-30,-45,-60,-90,-120,-135,-150,-180];
+const SNAP_T=4;
+let snapTimer;
+function maybeSnap(a){
+  let n=((a%360)+360)%360; if(n>180) n-=360;
+  for(const s of SNAPS){
+    const d=Math.abs(n-s);
+    if(d<=SNAP_T&&d>0.05){ haptic(12); showSnap(); return s; }
+    if(d<=0.05) return s;
+  }
+  return Math.round(n*10)/10;
+}
+function showSnap(){
+  snapRing.classList.add('show');
+  clearTimeout(snapTimer);
+  snapTimer=setTimeout(()=>snapRing.classList.remove('show'),400);
+}
+
+/* ── Double-tap peek ── */
+let lastTap=0, peekOn=false, peekPrev=S.opacity;
+function togglePeek(){
+  if(!peekOn){
+    peekPrev=S.opacity;
+    set({opacity:0.06}); opR.value=0.06; opV.textContent='6%';
+    peekOn=true; status('نظرة 👁'); haptic(15);
+  } else {
+    set({opacity:peekPrev}); opR.value=peekPrev; opV.textContent=Math.round(peekPrev*100)+'%';
+    peekOn=false; status('جاهز'); haptic(15);
+  }
+}
+
+/* ── Pointer gestures ── */
+const ptrs=new Map();
+let drag=null, pinch=null;
+const pdist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+const pang=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+const pmid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+
+overlayOuter.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  overlayOuter.setPointerCapture(e.pointerId);
+
+  // Double-tap
+  const now=Date.now();
+  if(ptrs.size===0&&now-lastTap<280){ togglePeek(); lastTap=0; return; }
+  lastTap=now;
+
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  if(ptrs.size===1&&!S.locked){
+    drag={sx:e.clientX,sy:e.clientY,ocx:S.cx,ocy:S.cy};
+    status('سحب…');
+  }
+  if(ptrs.size===2&&!S.locked){
+    const [p1,p2]=[...ptrs.values()];
+    pinch={d0:pdist(p1,p2),a0:pang(p1,p2),s0:S.scale,r0:S.rotation,cx0:S.cx,cy0:S.cy,m0:pmid(p1,p2)};
+    drag=null; status('تكبير/تدوير…');
+  }
+},{passive:false});
+
+overlayOuter.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)) return;
+  e.preventDefault();
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(S.locked) return;
+
+  if(ptrs.size===1&&drag){
+    set({cx:drag.ocx+(e.clientX-drag.sx),cy:drag.ocy+(e.clientY-drag.sy)});
+  }
+  if(ptrs.size===2&&pinch){
+    const [p1,p2]=[...ptrs.values()];
+    const d=pdist(p1,p2), a=pang(p1,p2), m=pmid(p1,p2);
+    const f=d/pinch.d0;
+    const newScale=Math.max(.06,Math.min(12,pinch.s0*f));
+    const snapped=maybeSnap(pinch.r0+(a-pinch.a0));
+    const newCx=pinch.m0.x+(pinch.cx0-pinch.m0.x)*f+(m.x-pinch.m0.x);
+    const newCy=pinch.m0.y+(pinch.cy0-pinch.m0.y)*f+(m.y-pinch.m0.y);
+    set({scale:newScale,rotation:snapped,cx:newCx,cy:newCy});
+    rotR.value=snapped; rotV.textContent=snapped+'°'; rotBadge.textContent=snapped+'°';
+  }
+},{passive:false});
+
+function onEnd(e){
+  const was=ptrs.size>=1; ptrs.delete(e.pointerId);
+  if(ptrs.size===0){
+    if(was&&!S.locked&&S.hasImage) push();
+    drag=null; pinch=null;
+    if(!S.locked) status('جاهز');
+  } else if(ptrs.size===1){
+    const [,pos]=[...ptrs.entries()][0];
+    drag={sx:pos.x,sy:pos.y,ocx:S.cx,ocy:S.cy}; pinch=null;
+    if(!S.locked) status('سحب…');
+  }
+}
+overlayOuter.addEventListener('pointerup',onEnd);
+overlayOuter.addEventListener('pointercancel',onEnd);
+overlayOuter.addEventListener('pointerleave',onEnd);
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+  const ctrl=e.ctrlKey||e.metaKey, k=e.key;
+  if(ctrl&&k==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; }
+  if(ctrl&&k==='s'){ e.preventDefault(); ssBtn.click(); return; }
+  if(ctrl) return;
+  const step=e.shiftKey?10:1;
+  const actions={
+    'f':()=>flipBtn.click(), 'l':()=>lockBtn.click(),
+    'r':()=>fitBtn.click(), 'g':()=>gridBtn.click(), 'c':()=>centerBtn.click(),
+    'ArrowLeft':()=>set({cx:S.cx-step}), 'ArrowRight':()=>set({cx:S.cx+step}),
+    'ArrowUp':()=>set({cy:S.cy-step}), 'ArrowDown':()=>set({cy:S.cy+step}),
+    '[':(){ const r=normAngle(S.rotation-1); set({rotation:r}); rotR.value=r; rotV.textContent=r+'°'; rotBadge.textContent=r+'°'; },
+    ']':(){ const r=normAngle(S.rotation+1); set({rotation:r}); rotR.value=r; rotV.textContent=r+'°'; rotBadge.textContent=r+'°'; },
+    '+':(){ const w=S.baseW+10; set({baseW:w,baseH:w*imageRatio()}); szR.value=Math.round(w); szV.textContent=Math.round(w); },
+    '=':(){ const w=S.baseW+10; set({baseW:w,baseH:w*imageRatio()}); szR.value=Math.round(w); szV.textContent=Math.round(w); },
+    '-':(){ const w=Math.max(40,S.baseW-10); set({baseW:w,baseH:w*imageRatio()}); szR.value=Math.round(w); szV.textContent=Math.round(w); },
+  };
+  if(actions[k]) actions[k]();
+});
+
+window.addEventListener('resize',()=>{ if(S.hasImage) set({cx:innerWidth/2,cy:innerHeight/2}); });
+
+/* ── Init ── */
+syncAll(); updHist(); q();
+})();
+</script>
+</body>
+</html>
