@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>AR Trace Pro+</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080f;
+  --glass:rgba(8,12,22,.88);
+  --glass2:rgba(255,255,255,.06);
+  --glass3:rgba(255,255,255,.12);
+  --text:#e8eeff;
+  --muted:rgba(200,210,255,.5);
+  --accent:#5ef0c8;
+  --accent2:#7c6bfa;
+  --accent3:#f06292;
+  --green:#2ddc92;
+  --red:#ff5f6d;
+  --yellow:#ffd166;
+  --border:rgba(255,255,255,.08);
+  --border-a:rgba(94,240,200,.25);
+  --shadow:0 20px 60px rgba(0,0,0,.7),0 2px 8px rgba(0,0,0,.4);
+  --r:16px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{
+  width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;
+  touch-action:none;-webkit-user-select:none;user-select:none;color:var(--text);
+}
+button,input,select{font:inherit}
+#stage{position:fixed;inset:0}
+#camera{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;transform-origin:center center;
+}
+#stage::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:.38;
+}
+#guides{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;transition:opacity .3s}
+#guides.active{opacity:1}
+#guides canvas{position:absolute;inset:0;width:100%;height:100%}
+#overlayOuter{
+  position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;
+  pointer-events:auto;touch-action:none;z-index:6;
+}
+#overlayInner{transform-origin:50% 50%;will-change:transform;position:relative}
+#overlayImg{
+  display:block;width:100%;height:auto;pointer-events:none;-webkit-user-drag:none;user-select:none;
+  will-change:filter,transform;transition:filter .15s ease;
+}
+#crosshair{
+  position:fixed;inset:0;pointer-events:none;z-index:7;
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .3s;
+}
+#crosshair.active{opacity:1}
+#crosshair::before,#crosshair::after{
+  content:'';position:absolute;background:rgba(94,240,200,.35);
+}
+#crosshair::before{width:1px;height:100%;left:50%}
+#crosshair::after{height:1px;width:100%;top:50%}
+.crossCenter{
+  width:18px;height:18px;border-radius:50%;
+  border:1.5px solid rgba(94,240,200,.6);
+  background:rgba(94,240,200,.1);
+}
+#hud{
+  position:fixed;left:14px;right:14px;top:calc(var(--safe-top) + 10px);z-index:20;
+  display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;
+}
+.chip{
+  pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;
+  border:1px solid var(--border);border-radius:999px;background:var(--glass);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);box-shadow:var(--shadow);
+  font-size:12px;font-weight:600;letter-spacing:.2px;white-space:nowrap;transition:all .2s;
+}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .4s,box-shadow .4s}
+.dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+#quickOpacity{
+  pointer-events:auto;display:flex;align-items:center;gap:8px;padding:6px 12px;
+  border:1px solid var(--border);border-radius:999px;background:var(--glass);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);box-shadow:var(--shadow);
+}
+#quickOpacity span{font-size:11px;color:var(--muted)}
+#quickOpR{width:72px;accent-color:var(--accent);height:20px;cursor:pointer}
+#fab{
+  position:fixed;right:14px;z-index:22;display:flex;flex-direction:column;gap:8px;align-items:center;
+}
+.fabBtn{
+  width:44px;height:44px;border-radius:14px;background:var(--glass);border:1px solid var(--border);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;
+  transition:transform .15s,background .2s,border-color .2s;color:var(--text);
+}
+.fabBtn:active{transform:scale(.9)}
+.fabBtn.active{background:rgba(94,240,200,.15);border-color:rgba(94,240,200,.4)}
+.fabBtn.locked{background:rgba(124,107,250,.2);border-color:rgba(124,107,250,.5)}
+#bottomPanel{
+  position:fixed;left:10px;right:10px;bottom:calc(var(--safe-bottom) + 10px);z-index:20;
+  border:1px solid var(--border);border-radius:22px;background:var(--glass);
+  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:var(--shadow);
+  transition:transform .4s cubic-bezier(.32,0,.18,1),opacity .35s;overflow:hidden;max-height:54vh;
+}
+#bottomPanel.hidden{transform:translateY(calc(100% + 24px));opacity:0;pointer-events:none}
+#panelInner{padding:12px 14px 14px}
+#panelHandle{width:36px;height:4px;border-radius:2px;background:var(--glass3);margin:0 auto 10px;cursor:grab}
+#tabs{
+  display:flex;gap:2px;margin-bottom:12px;background:rgba(0,0,0,.25);border-radius:12px;padding:3px;
+}
+.tab{
+  flex:1;text-align:center;padding:7px 4px;border-radius:9px;font-size:11.5px;font-weight:700;cursor:pointer;
+  color:var(--muted);letter-spacing:.2px;transition:background .2s,color .2s;
+}
+.tab.active{background:var(--glass3);color:var(--text)}
+.tabContent{display:none}
+.tabContent.active{display:block}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.row:last-child{margin-bottom:0}
+.btn{
+  appearance:none;border:1px solid var(--border);background:var(--glass2);color:var(--text);
+  border-radius:11px;padding:9px 12px;font-size:12px;font-weight:700;font-family:inherit;
+  cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;
+  transition:background .15s,transform .1s,border-color .15s,color .15s;line-height:1;
+}
+.btn:active{transform:scale(.94)}
+.btn.active{background:rgba(94,240,200,.12);border-color:var(--border-a);color:var(--accent)}
+.btn.danger{color:var(--red);border-color:rgba(255,95,109,.25)}
+.btn.locked{background:rgba(124,107,250,.15);border-color:rgba(124,107,250,.4);color:var(--accent2)}
+.btn.snap{background:rgba(240,98,146,.12);border-color:rgba(240,98,146,.35);color:var(--accent3)}
+.fileBtn{
+  border-color:var(--border-a);background:rgba(94,240,200,.08);color:var(--accent);position:relative;overflow:hidden;
+}
+.fileBtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.sliderRow{display:flex;align-items:center;gap:10px;margin-top:9px}
+.sliderLabel{min-width:62px;font-size:11px;color:var(--muted);text-align:right;font-weight:600}
+.sliderVal{min-width:40px;font-size:11.5px;color:var(--accent);text-align:left;font-weight:800;font-variant-numeric:tabular-nums}
+input[type=range]{flex:1;accent-color:var(--accent);height:20px;cursor:pointer}
+.filterGrid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:2px;
+}
+.fPill{
+  padding:9px 4px;border:1px solid var(--border);border-radius:11px;font-size:11px;font-weight:700;cursor:pointer;
+  color:var(--muted);background:var(--glass2);text-align:center;transition:all .2s;font-family:inherit;
+}
+.fPill.active{border-color:rgba(124,107,250,.5);color:var(--accent2);background:rgba(124,107,250,.12)}
+.hint{
+  margin-top:8px;font-size:11px;color:var(--muted);line-height:1.7;background:rgba(255,255,255,.03);
+  border-radius:10px;padding:7px 10px;
+}
+#toast{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.88);z-index:40;
+  padding:11px 20px;border:1px solid var(--border-a);border-radius:14px;background:var(--glass);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);font-size:13.5px;font-weight:700;
+  color:var(--accent);pointer-events:none;opacity:0;transition:opacity .22s,transform .22s;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#loader{
+  position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 40% 35%,rgba(10,20,45,.98),rgba(2,4,10,1));
+}
+.loaderBg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 20% 80%,rgba(94,240,200,.06) 0%,transparent 50%),
+    radial-gradient(circle at 80% 20%,rgba(124,107,250,.08) 0%,transparent 50%);
+}
+#loaderBox{
+  position:relative;text-align:center;max-width:320px;width:92%;padding:36px 26px 28px;
+  border:1px solid rgba(94,240,200,.15);border-radius:28px;background:rgba(8,12,22,.9);
+  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
+  box-shadow:0 0 60px rgba(94,240,200,.07),var(--shadow);
+}
+.loaderIcon{
+  width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,rgba(94,240,200,.2),rgba(124,107,250,.2));
+  border:1px solid rgba(94,240,200,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 18px;
+}
+#loaderBox h1{
+  font-size:30px;font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(135deg,var(--accent) 30%,var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px;
+}
+.loaderSub{
+  font-size:12px;color:var(--accent);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;opacity:.6;
+}
+#loaderBox p{color:var(--muted);font-size:13.5px;line-height:1.7;margin-bottom:22px}
+#startBtn{
+  display:inline-flex;align-items:center;gap:8px;padding:14px 30px;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04070f;font-weight:900;font-size:14px;
+  font-family:inherit;cursor:pointer;border:none;box-shadow:0 10px 32px rgba(94,240,200,.3);
+  transition:opacity .2s,transform .15s,box-shadow .2s;letter-spacing:.3px;
+}
+#startBtn:active{opacity:.85;transform:scale(.96)}
+#errorMsg{margin-top:14px;color:var(--red);font-size:12px;line-height:1.6}
+#flash{
+  position:fixed;inset:0;z-index:60;background:#fff;opacity:0;pointer-events:none;transition:opacity .08s;
+}
+#flash.pop{opacity:.5}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(94,240,200,.4)}
+  50%{box-shadow:0 0 0 6px rgba(94,240,200,0)}
+}
+.fabBtn.locked{animation:pulse 2s infinite}
+@media (max-width:420px){
+  .filterGrid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loaderBg"></div>
+  <div id="loaderBox">
+    <div class="loaderIcon">✏️</div>
+    <h1>AR Trace</h1>
+    <div class="loaderSub">أداة الرسم الاحترافية</div>
+    <p>اضغط تشغيل الكاميرا أو افتح الواجهة مباشرة، ثم اختر صورة من لوحة الأدوات وابدأ الرسم.</p>
+    <button id="startBtn">📷 تشغيل الكاميرا</button>
+    <button id="skipBtn" style="margin-top:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--text);padding:11px 18px;border-radius:14px;font-weight:800;cursor:pointer">🖼️ فتح الواجهة بدون كاميرا</button>
+    <div id="errorMsg"></div>
+  </div>
+</div>
+
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="guides"><canvas id="guidesCanvas"></canvas></div>
+  <div id="crosshair"><div class="crossCenter"></div></div>
+  <div id="overlayOuter">
+    <div id="overlayInner">
+      <img id="overlayImg" alt="">
+    </div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="toast"></div>
+
+<div id="hud">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <div class="chip">
+      <div class="dot yellow" id="camDot"></div>
+      <span id="camLabel">الكاميرا</span>
+    </div>
+    <div class="chip" id="statusChip"><span id="statusText">جاهز</span></div>
+  </div>
+  <div id="quickOpacity">
+    <span>شفافية</span>
+    <input id="quickOpR" type="range" min="0" max="1" step=".02" value=".55">
+    <span id="quickOpV" style="font-size:11px;color:var(--accent);font-weight:800;min-width:30px">55%</span>
+  </div>
+</div>
+
+<div id="fab">
+  <div class="fabBtn" id="panelToggle" title="الأدوات">⚙️</div>
+  <div class="fabBtn" id="lockFab" title="تثبيت">🔓</div>
+  <div class="fabBtn" id="gridFab" title="شبكة">⊞</div>
+  <div class="fabBtn" id="crossFab" title="محور">✛</div>
+  <div class="fabBtn" id="captureFab" title="لقطة">📸</div>
+  <div class="fabBtn" id="camFlipFab" title="كاميرا أمامية/خلفية">🔄</div>
+</div>
+
+<div id="bottomPanel">
+  <div id="panelInner">
+    <div id="panelHandle"></div>
+    <div id="tabs">
+      <div class="tab active" data-tab="image">الصورة</div>
+      <div class="tab" data-tab="adjust">الضبط</div>
+      <div class="tab" data-tab="filter">فلاتر</div>
+      <div class="tab" data-tab="guide">دليل</div>
+    </div>
+
+    <div class="tabContent active" id="tab-image">
+      <div class="row">
+        <label class="btn fileBtn">
+          📂 اختر صورة
+          <input id="fileInput" type="file" accept="image/*" capture="environment">
+        </label>
+        <button class="btn" id="fitBtn">⟲ ملاءمة</button>
+        <button class="btn" id="flipHBtn">↔ أفقي</button>
+        <button class="btn" id="flipVBtn">↕ عمودي</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="rot90Btn">↻ 90°</button>
+        <button class="btn" id="rot45Btn">↻ 45°</button>
+        <button class="btn" id="centerBtn">⊕ توسيط</button>
+        <button class="btn danger" id="resetBtn">✕ إعادة</button>
+      </div>
+      <div class="hint">
+        👆 إصبع واحد للتحريك &nbsp;•&nbsp; إصبعان للتكبير/التدوير<br>
+        🔒 اضغط التثبيت لمنع الحركة أثناء الرسم
+      </div>
+    </div>
+
+    <div class="tabContent" id="tab-adjust">
+      <div class="sliderRow">
+        <div class="sliderLabel">الشفافية</div>
+        <input id="opacityR" type="range" min="0" max="1" step=".01" value=".55">
+        <div class="sliderVal" id="opacityV">55%</div>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">الحجم</div>
+        <input id="sizeR" type="range" min="60" max="1800" step="1" value="320">
+        <div class="sliderVal" id="sizeV">320</div>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">الدوران</div>
+        <input id="rotR" type="range" min="-180" max="180" step=".5" value="0">
+        <div class="sliderVal" id="rotV">0°</div>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">السطوع</div>
+        <input id="brightR" type="range" min=".1" max="3" step=".05" value="1">
+        <div class="sliderVal" id="brightV">100%</div>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">التباين</div>
+        <input id="contrastR" type="range" min=".1" max="3" step=".05" value="1">
+        <div class="sliderVal" id="contrastV">100%</div>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">التشبع</div>
+        <input id="saturateR" type="range" min="0" max="3" step=".05" value="1">
+        <div class="sliderVal" id="saturateV">100%</div>
+      </div>
+    </div>
+
+    <div class="tabContent" id="tab-filter">
+      <div class="filterGrid" id="filterGrid">
+        <div class="fPill active" data-f="none">بدون</div>
+        <div class="fPill" data-f="grayscale">رمادي</div>
+        <div class="fPill" data-f="invert">معكوس</div>
+        <div class="fPill" data-f="sepia">كلاسيك</div>
+        <div class="fPill" data-f="edge">حواف</div>
+        <div class="fPill" data-f="hue">ألوان</div>
+        <div class="fPill" data-f="warm">دافئ</div>
+        <div class="fPill" data-f="sketch">رسم</div>
+      </div>
+      <div class="sliderRow" style="margin-top:10px">
+        <div class="sliderLabel">شدّة الفلتر</div>
+        <input id="fAmtR" type="range" min="0" max="100" step="1" value="100">
+        <div class="sliderVal" id="fAmtV">100%</div>
+      </div>
+    </div>
+
+    <div class="tabContent" id="tab-guide">
+      <div class="row">
+        <button class="btn" id="gridNoneBtn">بدون شبكة</button>
+        <button class="btn" id="grid3Btn">ثلث × ثلث</button>
+        <button class="btn" id="grid4Btn">ربع × ربع</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="goldenBtn">✦ ذهبي</button>
+        <button class="btn" id="diagonalBtn">⟋ أقطار</button>
+        <button class="btn" id="circleBtn">◯ دائرة</button>
+      </div>
+      <div class="sliderRow">
+        <div class="sliderLabel">شفافية الشبكة</div>
+        <input id="guideAlphaR" type="range" min="10" max="100" step="1" value="30">
+        <div class="sliderVal" id="guideAlphaV">30%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const $ = (id) => document.getElementById(id);
+const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const LS_KEY = 'ar-trace-plus-v1';
+
+const camera = $('camera');
+const overlayOuter = $('overlayOuter');
+const overlayInner = $('overlayInner');
+const overlayImg = $('overlayImg');
+const fileInput = $('fileInput');
+const loader = $('loader');
+const errorMsg = $('errorMsg');
+const camDot = $('camDot');
+const camLabel = $('camLabel');
+const statusText = $('statusText');
+const startBtn = $('startBtn');
+const skipBtn = $('skipBtn');
+const toastEl = $('toast');
+const fitBtn = $('fitBtn');
+const flipHBtn = $('flipHBtn');
+const flipVBtn = $('flipVBtn');
+const rot90Btn = $('rot90Btn');
+const rot45Btn = $('rot45Btn');
+const centerBtn = $('centerBtn');
+const resetBtn = $('resetBtn');
+const panelToggle = $('panelToggle');
+const bottomPanel = $('bottomPanel');
+const lockFab = $('lockFab');
+const gridFab = $('gridFab');
+const crossFab = $('crossFab');
+const captureFab = $('captureFab');
+const camFlipFab = $('camFlipFab');
+const quickOpR = $('quickOpR');
+const quickOpV = $('quickOpV');
+const opacityR = $('opacityR');
+const sizeR = $('sizeR');
+const rotR = $('rotR');
+const brightR = $('brightR');
+const contrastR = $('contrastR');
+const saturateR = $('saturateR');
+const fAmtR = $('fAmtR');
+const opacityV = $('opacityV');
+const sizeV = $('sizeV');
+const rotV = $('rotV');
+const brightV = $('brightV');
+const contrastV = $('contrastV');
+const saturateV = $('saturateV');
+const fAmtV = $('fAmtV');
+const guidesEl = $('guides');
+const guidesCanvas = $('guidesCanvas');
+const crosshairEl = $('crosshair');
+const flashEl = $('flash');
+const fab = $('fab');
+
+const S = {
+  cx: innerWidth / 2,
+  cy: innerHeight / 2,
+  scale: 1,
+  rotation: 0,
+  baseW: 320,
+  baseH: 320,
+  opacity: 0.55,
+  brightness: 1,
+  contrast: 1,
+  saturate: 1,
+  flipH: false,
+  flipV: false,
+  locked: false,
+  filter: 'none',
+  filterAmt: 1,
+  hasImage: false,
+  guideMode: 'none',
+  guideAlpha: 0.3,
+  camFacing: 'environment',
+  camStream: null,
+  showGuides: false,
+  showCrosshair: false,
+  imageSrc: '',
+};
+
+let raf = 0;
+let camRestarting = false;
+let currentObjectUrl = '';
+let panelVisible = true;
+let lastTap = 0;
+
+function status(t){ statusText.textContent = t; }
+
+function haptic(style){
+  try{
+    if(navigator.vibrate){
+      if(style === 'light') navigator.vibrate(8);
+      else if(style === 'medium') navigator.vibrate(18);
+      else if(style === 'heavy') navigator.vibrate([15,8,15]);
+    }
+  }catch(_){}
+}
+
+function showToast(msg, color){
+  toastEl.textContent = msg;
+  toastEl.style.color = color || 'var(--accent)';
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toastEl.classList.remove('show'), 1500);
+}
+
+function hideLoader(){
+  if(loader && loader.style.display !== 'none') loader.style.display = 'none';
+}
+
+function saveState(){
+  try{
+    const data = {
+      opacity:S.opacity, brightness:S.brightness, contrast:S.contrast, saturate:S.saturate,
+      filter:S.filter, filterAmt:S.filterAmt, guideMode:S.guideMode, guideAlpha:S.guideAlpha,
+      flipH:S.flipH, flipV:S.flipV, locked:S.locked, camFacing:S.camFacing,
+      scale:S.scale, rotation:S.rotation, baseW:S.baseW, baseH:S.baseH, cx:S.cx, cy:S.cy,
+      showGuides:S.showGuides, showCrosshair:S.showCrosshair,
+      imageSrc:S.imageSrc
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  }catch(_){}
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    Object.assign(S, d);
+  }catch(_){}
+}
+
+function schedRender(){
+  if(!raf) raf = requestAnimationFrame(render);
+}
+
+function render(){
+  raf = 0;
+  const {cx,cy,scale,rotation,baseW,opacity,brightness,contrast,saturate,flipH,flipV,filter,filterAmt} = S;
+  const tx = cx - baseW / 2;
+  const ty = cy - S.baseH / 2;
+  overlayOuter.style.transform = `translate(${tx}px,${ty}px)`;
+  overlayOuter.style.opacity = opacity;
+  overlayInner.style.width = baseW + 'px';
+  overlayInner.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
+
+  let fStr = `brightness(${brightness}) contrast(${contrast}) saturate(${saturate})`;
+  let extra = '';
+  const a = filterAmt;
+  if(filter === 'grayscale') extra = `grayscale(${a})`;
+  else if(filter === 'invert') extra = `invert(${a})`;
+  else if(filter === 'sepia') extra = `sepia(${a})`;
+  else if(filter === 'hue') extra = `hue-rotate(${Math.round(a * 360)}deg)`;
+  else if(filter === 'edge') extra = `contrast(${1 + a * 10}) grayscale(1) brightness(1.2)`;
+  else if(filter === 'warm') extra = `sepia(${a * .4}) saturate(${1 + a * .6}) hue-rotate(-10deg)`;
+  else if(filter === 'sketch') extra = `grayscale(1) contrast(${1 + a * 4}) brightness(${1 + a * .3})`;
+
+  overlayImg.style.filter = fStr + (extra ? ' ' + extra : '');
+  overlayImg.style.transform = (flipH || flipV) ? `scale(${flipH ? -1 : 1},${flipV ? -1 : 1})` : 'none';
+}
+
+function setS(p){
+  Object.assign(S, p);
+  schedRender();
+  saveState();
+}
+
+function applyUIFromState(){
+  quickOpR.value = S.opacity;
+  quickOpV.textContent = Math.round(S.opacity * 100) + '%';
+  opacityR.value = S.opacity;
+  opacityV.textContent = Math.round(S.opacity * 100) + '%';
+  sizeR.value = Math.round(S.baseW);
+  sizeV.textContent = Math.round(S.baseW);
+  rotR.value = S.rotation;
+  rotV.textContent = Math.round(S.rotation) + '°';
+  brightR.value = S.brightness;
+  brightV.textContent = Math.round(S.brightness * 100) + '%';
+  contrastR.value = S.contrast;
+  contrastV.textContent = Math.round(S.contrast * 100) + '%';
+  saturateR.value = S.saturate;
+  saturateV.textContent = Math.round(S.saturate * 100) + '%';
+  fAmtR.value = Math.round(S.filterAmt * 100);
+  fAmtV.textContent = Math.round(S.filterAmt * 100) + '%';
+  flipHBtn.classList.toggle('active', S.flipH);
+  flipVBtn.classList.toggle('active', S.flipV);
+  lockFab.textContent = S.locked ? '🔒' : '🔓';
+  lockFab.className = 'fabBtn' + (S.locked ? ' locked' : '');
+  gridFab.classList.toggle('active', S.showGuides);
+  crossFab.classList.toggle('active', S.showCrosshair);
+  guidesEl.classList.toggle('active', S.showGuides);
+  crosshairEl.classList.toggle('active', S.showCrosshair);
+  qsa('.fPill').forEach(el => el.classList.toggle('active', el.dataset.f === S.filter));
+  ['gridNoneBtn','grid3Btn','grid4Btn','goldenBtn','diagonalBtn','circleBtn'].forEach(id => $(id).classList.remove('active'));
+  const map = {none:'gridNoneBtn',thirds:'grid3Btn',quarters:'grid4Btn',golden:'goldenBtn',diagonal:'diagonalBtn',circle:'circleBtn'};
+  if(map[S.guideMode]) $(map[S.guideMode]).classList.add('active');
+  $('guideAlphaR').value = Math.round(S.guideAlpha * 100);
+  $('guideAlphaV').textContent = Math.round(S.guideAlpha * 100) + '%';
+}
+
+function setGuideMode(mode){
+  S.guideMode = mode;
+  if(mode !== 'none'){
+    S.showGuides = true;
+    guidesEl.classList.add('active');
+    gridFab.classList.add('active');
+  }
+  saveState();
+  drawGuides();
+  applyUIFromState();
+  haptic('light');
+}
+
+function drawGuides(){
+  const c = guidesCanvas;
+  const ctx = c.getContext('2d');
+  const dpr = Math.max(1, devicePixelRatio || 1);
+  const w = innerWidth, h = innerHeight;
+  c.width = Math.round(w * dpr);
+  c.height = Math.round(h * dpr);
+  c.style.width = w + 'px';
+  c.style.height = h + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  if(!S.showGuides || S.guideMode === 'none') return;
+
+  ctx.strokeStyle = `rgba(94,240,200,${S.guideAlpha})`;
+  ctx.lineWidth = 1;
+
+  if(S.guideMode === 'thirds' || S.guideMode === 'quarters'){
+    const n = S.guideMode === 'thirds' ? 3 : 4;
+    ctx.beginPath();
+    for(let i = 1; i < n; i++){
+      ctx.moveTo(w * i / n, 0); ctx.lineTo(w * i / n, h);
+      ctx.moveTo(0, h * i / n); ctx.lineTo(w, h * i / n);
+    }
+    ctx.stroke();
+  }else if(S.guideMode === 'golden'){
+    const phi = 0.618;
+    ctx.beginPath();
+    ctx.moveTo(w * phi, 0); ctx.lineTo(w * phi, h);
+    ctx.moveTo(w * (1 - phi), 0); ctx.lineTo(w * (1 - phi), h);
+    ctx.moveTo(0, h * phi); ctx.lineTo(w, h * phi);
+    ctx.moveTo(0, h * (1 - phi)); ctx.lineTo(w, h * (1 - phi));
+    ctx.stroke();
+  }else if(S.guideMode === 'diagonal'){
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(w,h);
+    ctx.moveTo(w,0); ctx.lineTo(0,h);
+    ctx.moveTo(0,h/2); ctx.lineTo(w/2,0);
+    ctx.moveTo(w,h/2); ctx.lineTo(w/2,0);
+    ctx.moveTo(0,h/2); ctx.lineTo(w/2,h);
+    ctx.moveTo(w,h/2); ctx.lineTo(w/2,h);
+    ctx.stroke();
+  }else if(S.guideMode === 'circle'){
+    const cx = w / 2, cy = h / 2, r = Math.min(w, h) * .4;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,r * .618,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,r * .382,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx-r,cy); ctx.lineTo(cx+r,cy);
+    ctx.moveTo(cx,cy-r); ctx.lineTo(cx,cy+r);
+    ctx.stroke();
+  }
+}
+
+function positionFab(){
+  const ph = panelVisible ? (bottomPanel.offsetHeight + 16) : 14;
+  const safeB = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom') || '0', 10) || 0;
+  fab.style.bottom = (ph + safeB + 4) + 'px';
+}
+
+function drawVideoCover(ctx, video, x, y, w, h){
+  const vw = video.videoWidth || video.width;
+  const vh = video.videoHeight || video.height;
+  if(!vw || !vh) return;
+  const scale = Math.max(w / vw, h / vh);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = (vw - sw) / 2;
+  const sy = (vh - sh) / 2;
+  ctx.drawImage(video, sx, sy, sw, sh, x, y, w, h);
+}
+
+function startOverlayFromImage(){
+  if(!overlayImg.naturalWidth) return;
+  const nw = overlayImg.naturalWidth;
+  const nh = overlayImg.naturalHeight;
+  const ratio = nh / nw;
+  const vw = innerWidth, vh = innerHeight;
+  let w = Math.min(vw * .75, vh * .6 / ratio, 480);
+  if(!Number.isFinite(w) || w <= 0) w = 320;
+  setS({
+    baseW:w, baseH:w * ratio, scale:1, rotation:0,
+    flipH:false, flipV:false, cx:vw/2, cy:vh/2, hasImage:true
+  });
+  sizeR.value = Math.round(w);
+  sizeV.textContent = Math.round(w);
+  rotR.value = '0';
+  rotV.textContent = '0°';
+  flipHBtn.classList.remove('active');
+  flipVBtn.classList.remove('active');
+  status('تم التحميل ✓');
+  showToast('✓ الصورة جاهزة');
+  haptic('medium');
+  saveState();
+}
+
+function loadImage(src, keepExistingURL = false){
+  if(currentObjectUrl && !keepExistingURL) URL.revokeObjectURL(currentObjectUrl);
+  currentObjectUrl = keepExistingURL ? currentObjectUrl : src.startsWith('blob:') ? src : '';
+  overlayImg.src = src;
+  status('جاري التحميل…');
+  saveState();
+}
+
+function openPanel(open){
+  panelVisible = open;
+  bottomPanel.classList.toggle('hidden', !open);
+  panelToggle.textContent = open ? '⚙️' : '☰';
+  setTimeout(positionFab, 40);
+}
+
+async function startCamera(restarting = false){
+  // Make the workspace accessible immediately after the user taps.
+  hideLoader();
+  camRestarting = restarting;
+  if(!restarting){
+    camDot.className = 'dot yellow';
+    camLabel.textContent = 'جاري…';
+    errorMsg.textContent = '';
+  }
+  if(S.camStream){
+    S.camStream.getTracks().forEach(t => t.stop());
+    S.camStream = null;
+  }
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error('not supported');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:S.camFacing},
+        width:{ideal:1920},
+        height:{ideal:1080},
+        frameRate:{ideal:60, min:30}
+      },
+      audio:false
+    });
+    S.camStream = stream;
+    camera.srcObject = stream;
+    camera.onloadedmetadata = () => camera.play().catch(()=>{});
+    camera.style.transform = S.camFacing === 'user' ? 'scaleX(-1)' : 'none';
+    camDot.className = 'dot green';
+    camLabel.textContent = S.camFacing === 'user' ? '📷 أمامية' : '📷 خلفية';
+    status('جاهز');
+    if(restarting) showToast(S.camFacing === 'user' ? 'كاميرا أمامية' : 'كاميرا خلفية');
+  }catch(e){
+    console.error(e);
+    camDot.className = 'dot red';
+    camLabel.textContent = 'بدون كاميرا';
+    if(!restarting) errorMsg.textContent = 'تعذّر تشغيل الكاميرا. يمكنك متابعة العمل واختيار صورة الآن.';
+    showToast('وضع بدون كاميرا', 'var(--red)');
+  }
+}
+
+startBtn.addEventListener('click', startCamera);
+skipBtn.addEventListener('click', ()=>{ hideLoader(); status('بدون كاميرا'); showToast('واجهة الرسم جاهزة'); });
+camFlipFab.addEventListener('click', () => {
+  S.camFacing = S.camFacing === 'environment' ? 'user' : 'environment';
+  saveState();
+  haptic('light');
+  startCamera(true);
+});
+
+overlayImg.addEventListener('load', () => {
+  if(!overlayImg.naturalWidth) return;
+  startOverlayFromImage();
+});
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  if(currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+  currentObjectUrl = url;
+  overlayImg.src = url;
+  status('جاري التحميل…');
+});
+
+quickOpR.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  quickOpV.textContent = Math.round(v * 100) + '%';
+  opacityR.value = v;
+  opacityV.textContent = Math.round(v * 100) + '%';
+  setS({opacity:v});
+});
+
+fitBtn.addEventListener('click', () => {
+  if(!S.hasImage) return;
+  const ratio = overlayImg.naturalHeight / overlayImg.naturalWidth;
+  const vw = innerWidth, vh = innerHeight;
+  let w = Math.min(vw * .78, vh * .65 / ratio, 560);
+  if(!Number.isFinite(w) || w <= 0) w = 320;
+  setS({baseW:w, baseH:w*ratio, scale:1, rotation:0, cx:vw/2, cy:vh/2});
+  sizeR.value = Math.round(w);
+  sizeV.textContent = Math.round(w);
+  rotR.value = '0';
+  rotV.textContent = '0°';
+  status('ملاءمة ✓');
+  haptic('light');
+});
+
+flipHBtn.addEventListener('click', () => {
+  setS({flipH:!S.flipH});
+  flipHBtn.classList.toggle('active', S.flipH);
+  haptic('light');
+});
+flipVBtn.addEventListener('click', () => {
+  setS({flipV:!S.flipV});
+  flipVBtn.classList.toggle('active', S.flipV);
+  haptic('light');
+});
+
+rot90Btn.addEventListener('click', () => {
+  const r = (S.rotation + 90) % 360;
+  setS({rotation:r});
+  const disp = r > 180 ? r - 360 : r;
+  rotR.value = disp;
+  rotV.textContent = Math.round(disp) + '°';
+  haptic('light');
+});
+rot45Btn.addEventListener('click', () => {
+  const r = (S.rotation + 45) % 360;
+  setS({rotation:r});
+  const disp = r > 180 ? r - 360 : r;
+  rotR.value = disp;
+  rotV.textContent = Math.round(disp) + '°';
+  haptic('light');
+});
+
+centerBtn.addEventListener('click', () => {
+  setS({cx:innerWidth/2, cy:innerHeight/2});
+  haptic('light');
+  showToast('⊕ توسيط');
+});
+
+resetBtn.addEventListener('click', () => {
+  setS({
+    scale:1, rotation:0, flipH:false, flipV:false,
+    cx:innerWidth/2, cy:innerHeight/2,
+    opacity:.55, brightness:1, contrast:1, saturate:1,
+    filter:'none', filterAmt:1
+  });
+  applyUIFromState();
+  haptic('medium');
+  showToast('↺ إعادة التعيين');
+  status('إعادة ✓');
+});
+
+lockFab.addEventListener('click', () => {
+  S.locked = !S.locked;
+  lockFab.textContent = S.locked ? '🔒' : '🔓';
+  lockFab.className = 'fabBtn' + (S.locked ? ' locked' : '');
+  showToast(S.locked ? '🔒 مثبّتة' : '🔓 حرّة', S.locked ? 'var(--accent2)' : 'var(--accent)');
+  haptic(S.locked ? 'heavy' : 'medium');
+  status(S.locked ? 'مثبّت' : 'حر');
+  saveState();
+});
+
+gridFab.addEventListener('click', () => {
+  S.showGuides = !S.showGuides;
+  guidesEl.classList.toggle('active', S.showGuides);
+  gridFab.classList.toggle('active', S.showGuides);
+  haptic('light');
+  if(S.showGuides && S.guideMode === 'none') setGuideMode('thirds');
+  saveState();
+});
+
+crossFab.addEventListener('click', () => {
+  S.showCrosshair = !S.showCrosshair;
+  crosshairEl.classList.toggle('active', S.showCrosshair);
+  crossFab.classList.toggle('active', S.showCrosshair);
+  haptic('light');
+  saveState();
+});
+
+$('gridNoneBtn').addEventListener('click', () => setGuideMode('none'));
+$('grid3Btn').addEventListener('click', () => setGuideMode('thirds'));
+$('grid4Btn').addEventListener('click', () => setGuideMode('quarters'));
+$('goldenBtn').addEventListener('click', () => setGuideMode('golden'));
+$('diagonalBtn').addEventListener('click', () => setGuideMode('diagonal'));
+$('circleBtn').addEventListener('click', () => setGuideMode('circle'));
+
+$('guideAlphaR').addEventListener('input', e => {
+  const v = parseInt(e.target.value, 10);
+  $('guideAlphaV').textContent = v + '%';
+  S.guideAlpha = v / 100;
+  drawGuides();
+  saveState();
+});
+
+opacityR.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  opacityV.textContent = Math.round(v * 100) + '%';
+  quickOpR.value = v;
+  quickOpV.textContent = Math.round(v * 100) + '%';
+  setS({opacity:v});
+});
+
+sizeR.addEventListener('input', e => {
+  const w = parseInt(e.target.value, 10);
+  sizeV.textContent = w;
+  const ratio = (S.hasImage && overlayImg.naturalWidth) ? overlayImg.naturalHeight / overlayImg.naturalWidth : 1;
+  setS({baseW:w, baseH:w * ratio});
+});
+
+rotR.addEventListener('input', e => {
+  const d = parseFloat(e.target.value);
+  rotV.textContent = Math.round(d) + '°';
+  setS({rotation:d});
+});
+
+brightR.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  brightV.textContent = Math.round(v * 100) + '%';
+  setS({brightness:v});
+});
+
+contrastR.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  contrastV.textContent = Math.round(v * 100) + '%';
+  setS({contrast:v});
+});
+
+saturateR.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  saturateV.textContent = Math.round(v * 100) + '%';
+  setS({saturate:v});
+});
+
+fAmtR.addEventListener('input', e => {
+  const v = parseInt(e.target.value, 10);
+  fAmtV.textContent = v + '%';
+  setS({filterAmt:v/100});
+});
+
+qsa('.fPill').forEach(p => {
+  p.addEventListener('click', () => {
+    qsa('.fPill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    setS({filter:p.dataset.f});
+    haptic('light');
+  });
+});
+
+qsa('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    qsa('.tab').forEach(t => t.classList.remove('active'));
+    qsa('.tabContent').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    $('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+panelToggle.addEventListener('click', () => {
+  openPanel(!panelVisible);
+  haptic('light');
+});
+
+window.addEventListener('resize', () => {
+  if(S.hasImage) {
+    // keep the image centered on resize, but do not reset scale/rotation
+    setS({cx:innerWidth/2, cy:innerHeight/2});
+  }
+  drawGuides();
+  positionFab();
+});
+
+const ptrs = new Map();
+let drag = null;
+let pinch = null;
+
+function ptPos(e){ return {x:e.clientX, y:e.clientY}; }
+function getDist(a,b){ return Math.hypot(b.x - a.x, b.y - a.y); }
+function getAngle(a,b){ return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI; }
+function getMid(a,b){ return {x:(a.x + b.x)/2, y:(a.y + b.y)/2}; }
+
+overlayOuter.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  overlayOuter.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, ptPos(e));
+
+  if(ptrs.size === 1 && !S.locked){
+    const p = ptPos(e);
+    drag = { id:e.pointerId, sx:p.x, sy:p.y, ocx:S.cx, ocy:S.cy };
+    status('سحب…');
+  }
+
+  if(ptrs.size === 2 && !S.locked){
+    const [p1,p2] = Array.from(ptrs.values());
+    pinch = {
+      startDist:getDist(p1,p2),
+      startAngle:getAngle(p1,p2),
+      startScale:S.scale,
+      startRotation:S.rotation,
+      startCx:S.cx,
+      startCy:S.cy,
+      mid:getMid(p1,p2),
+    };
+    drag = null;
+    status('تكبير…');
+  }
+
+  const now = Date.now();
+  if(now - lastTap < 300 && ptrs.size <= 1){
+    setS({cx:innerWidth/2, cy:innerHeight/2});
+    showToast('⊕ توسيط');
+    haptic('medium');
+  }
+  lastTap = now;
+},{passive:false, capture:true});
+
+overlayOuter.addEventListener('pointermove', e => {
+  if(!ptrs.has(e.pointerId)) return;
+  e.preventDefault();
+  ptrs.set(e.pointerId, ptPos(e));
+  if(S.locked) return;
+
+  if(ptrs.size === 1 && drag){
+    const cur = ptPos(e);
+    setS({
+      cx: drag.ocx + (cur.x - drag.sx),
+      cy: drag.ocy + (cur.y - drag.sy)
+    });
+  }
+
+  if(ptrs.size === 2 && pinch){
+    const [p1,p2] = Array.from(ptrs.values());
+    const dist = getDist(p1,p2);
+    const angle = getAngle(p1,p2);
+    const mid = getMid(p1,p2);
+    const f = dist / pinch.startDist;
+    const newScale = clamp(pinch.startScale * f, .05, 14);
+    const dAngle = angle - pinch.startAngle;
+    const newRotation = pinch.startRotation + dAngle;
+    const newCx = pinch.mid.x + (pinch.startCx - pinch.mid.x) * f + (mid.x - pinch.mid.x);
+    const newCy = pinch.mid.y + (pinch.startCy - pinch.mid.y) * f + (mid.y - pinch.mid.y);
+    setS({scale:newScale, rotation:newRotation, cx:newCx, cy:newCy});
+
+    let dispRot = ((newRotation % 360) + 360) % 360;
+    if(dispRot > 180) dispRot -= 360;
+    rotR.value = Math.round(dispRot * 10) / 10;
+    rotV.textContent = Math.round(dispRot) + '°';
+  }
+},{passive:false});
+
+function onEnd(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size === 0){
+    drag = null;
+    pinch = null;
+    if(!S.locked) status('جاهز');
+  }else if(ptrs.size === 1){
+    const [id, pos] = Array.from(ptrs.entries())[0];
+    drag = { id, sx:pos.x, sy:pos.y, ocx:S.cx, ocy:S.cy };
+    pinch = null;
+    if(!S.locked) status('سحب…');
+  }
+}
+overlayOuter.addEventListener('pointerup', onEnd);
+overlayOuter.addEventListener('pointercancel', onEnd);
+
+captureFab.addEventListener('click', async () => {
+  haptic('heavy');
+  flashEl.style.transition = 'none';
+  flashEl.classList.add('pop');
+  requestAnimationFrame(() => {
+    flashEl.style.transition = 'opacity .5s ease';
+    flashEl.classList.remove('pop');
+  });
+
+  try{
+    const dpr = Math.max(1, devicePixelRatio || 1);
+    const vw = innerWidth;
+    const vh = innerHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    if(camera.readyState >= 2){
+      if(S.camFacing === 'user'){
+        ctx.save();
+        ctx.scale(-1,1);
+        drawVideoCover(ctx, camera, -vw, 0, vw, vh);
+        ctx.restore();
+      }else{
+        drawVideoCover(ctx, camera, 0, 0, vw, vh);
+      }
+    }else{
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0,0,vw,vh);
+    }
+
+    if(S.hasImage && overlayImg.complete && overlayImg.naturalWidth){
+      ctx.save();
+      ctx.globalAlpha = S.opacity;
+      ctx.translate(S.cx, S.cy);
+      ctx.rotate(S.rotation * Math.PI / 180);
+      ctx.scale(S.scale * (S.flipH ? -1 : 1), S.scale * (S.flipV ? -1 : 1));
+      ctx.filter = `brightness(${S.brightness}) contrast(${S.contrast}) saturate(${S.saturate})`;
+      ctx.drawImage(overlayImg, -S.baseW/2, -S.baseH/2, S.baseW, S.baseH);
+      ctx.restore();
+    }
+
+    const link = document.createElement('a');
+    link.download = 'ar-trace-' + Date.now() + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('📸 تم الحفظ!');
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ تعذّر الحفظ', 'var(--red)');
+  }
+});
+
+function initFromSavedImage(){
+  if(!S.imageSrc) return;
+  overlayImg.src = S.imageSrc;
+}
+
+function initFromState(){
+  applyUIFromState();
+  drawGuides();
+  positionFab();
+  setTimeout(positionFab, 120);
+  if(S.showGuides) guidesEl.classList.add('active');
+  if(S.showCrosshair) crosshairEl.classList.add('active');
+  if(S.imageSrc) overlayImg.src = S.imageSrc;
+  render();
+}
+
+function saveImageSrcIfBlob(src){
+  S.imageSrc = src;
+  saveState();
+}
+
+loadState();
+initFromState();
+
+overlayImg.addEventListener('load', () => {
+  if(!overlayImg.naturalWidth) return;
+  S.hasImage = true;
+  const nw = overlayImg.naturalWidth;
+  const nh = overlayImg.naturalHeight;
+  const ratio = nh / nw;
+  if(!S.baseW || !S.baseH || !Number.isFinite(S.baseW) || !Number.isFinite(S.baseH)){
+    const vw = innerWidth, vh = innerHeight;
+    let w = Math.min(vw * .75, vh * .6 / ratio, 480);
+    if(!Number.isFinite(w) || w <= 0) w = 320;
+    S.baseW = w;
+    S.baseH = w * ratio;
+  }else{
+    S.baseH = S.baseW * ratio;
+  }
+  S.cx = innerWidth/2;
+  S.cy = innerHeight/2;
+  sizeR.value = Math.round(S.baseW);
+  sizeV.textContent = Math.round(S.baseW);
+  rotR.value = S.rotation || 0;
+  rotV.textContent = Math.round(S.rotation || 0) + '°';
+  status('تم التحميل ✓');
+  showToast('✓ الصورة جاهزة');
+  haptic('medium');
+  saveState();
+  schedRender();
+});
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  S.imageSrc = url;
+  saveState();
+  overlayImg.src = url;
+  status('جاري التحميل…');
+});
+
+$('gridNoneBtn').addEventListener('click', () => setGuideMode('none'));
+$('grid3Btn').addEventListener('click', () => setGuideMode('thirds'));
+$('grid4Btn').addEventListener('click', () => setGuideMode('quarters'));
+$('goldenBtn').addEventListener('click', () => setGuideMode('golden'));
+$('diagonalBtn').addEventListener('click', () => setGuideMode('diagonal'));
+$('circleBtn').addEventListener('click', () => setGuideMode('circle'));
+
+applyUIFromState();
+
+window.addEventListener('resize', () => {
+  drawGuides();
+  positionFab();
+});
+
+schedRender();
+positionFab();
+drawGuides();
+
+})();
+</script>
+</body>
+</html>
