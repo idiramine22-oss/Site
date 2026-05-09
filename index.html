@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<title>AR Trace Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --glass:rgba(5,8,20,.92);
+  --glass2:rgba(255,255,255,.055);
+  --glass3:rgba(255,255,255,.11);
+  --text:#dce8ff;
+  --muted:rgba(170,195,255,.46);
+  --accent:#3fffc5;
+  --accent2:#a78bfa;
+  --accent3:#fb7185;
+  --accent4:#fbbf24;
+  --green:#22d3a5;
+  --red:#f43f5e;
+  --yellow:#f59e0b;
+  --border:rgba(255,255,255,.07);
+  --border-a:rgba(63,255,197,.22);
+  --shadow:0 20px 60px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;
+  touch-action:none;-webkit-user-select:none;user-select:none;color:var(--text)}
+
+/* ── STAGE ── */
+#stage{position:fixed;inset:0;z-index:0}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;will-change:transform;transition:filter .25s}
+#camera.mirror{transform:scaleX(-1)}
+
+/* ── FX ── */
+#vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 44%,rgba(0,0,0,.68) 100%);opacity:0;transition:opacity .4s}
+#vignette.on{opacity:1}
+#scanLines{position:fixed;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(0,0,0,.05) 2px,rgba(0,0,0,.05) 4px);opacity:0;transition:opacity .3s}
+#scanLines.on{opacity:1}
+#traceOverlay{position:fixed;inset:0;z-index:2;pointer-events:none;background:rgba(0,0,0,.18);mix-blend-mode:multiply;opacity:0;transition:opacity .4s}
+#traceOverlay.on{opacity:1}
+
+/* ── OVERLAY IMAGE ── */
+#overlayOuter{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;pointer-events:auto;touch-action:none;z-index:4}
+#overlayInner{transform-origin:50% 50%;will-change:transform;position:relative}
+#overlayImg{display:block;width:100%;height:auto;pointer-events:none;-webkit-user-drag:none;will-change:filter,transform}
+
+/* ── CANVASES ── */
+#guideCvs{position:fixed;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .3s}
+#guideCvs.on{opacity:1}
+#drawCvs{position:fixed;inset:0;z-index:6;display:none;touch-action:none;cursor:none}
+#drawCvs.on{display:block}
+
+/* ── BRUSH CURSOR ── */
+#brushCursor{position:fixed;z-index:7;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%);display:none}
+#brushCursor.on{display:block}
+/* pen mode: colored ring */
+#brushCursor.pen{border:1.5px solid rgba(255,255,255,.9);mix-blend-mode:difference;background:transparent}
+/* eraser mode: white dashed */
+#brushCursor.eraser{border:1.5px dashed rgba(255,255,255,.7);background:rgba(255,255,255,.06)}
+/* line mode: crosshair dot */
+#brushCursor.line{border:1.5px solid rgba(255,255,255,.9);mix-blend-mode:difference}
+
+/* ── CROSSHAIR ── */
+#crosshair{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;transition:opacity .3s}
+#crosshair.on{opacity:1}
+#crosshair::before{content:’’;position:absolute;width:1px;height:100%;left:50%;background:linear-gradient(to bottom,transparent,rgba(63,255,197,.5) 25%,rgba(63,255,197,.5) 75%,transparent)}
+#crosshair::after{content:’’;position:absolute;height:1px;width:100%;top:50%;background:linear-gradient(to right,transparent,rgba(63,255,197,.5) 25%,rgba(63,255,197,.5) 75%,transparent)}
+.crossRing{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(63,255,197,.75);background:rgba(63,255,197,.07)}
+.crossRing::before{content:’’;position:absolute;inset:4px;border-radius:50%;background:rgba(63,255,197,.4)}
+
+/* ── RULER ── */
+#ruler{position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0;transition:opacity .3s}
+#ruler.on{opacity:1}
+#rulerH,#rulerV{position:absolute;background:rgba(251,191,36,.55);pointer-events:auto;cursor:grab}
+#rulerH{left:0;right:0;height:2px}
+#rulerV{top:0;bottom:0;width:2px}
+.rulerLbl{position:absolute;font-size:10px;font-weight:700;color:var(–yellow);background:var(–glass);padding:2px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+
+/* ── LEVEL ── */
+#levelWrap{position:fixed;z-index:30;pointer-events:none;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px}
+#levelWrap.on{display:flex}
+#levelBar{width:130px;height:5px;border-radius:3px;background:rgba(255,255,255,.1);position:relative}
+#levelFill{position:absolute;top:0;height:100%;border-radius:3px;transition:left .08s,width .08s}
+#levelText{font-size:10px;font-weight:800;color:var(–muted);min-width:36px;text-align:center}
+
+/* ── LINE PREVIEW ── */
+#linePrev{position:fixed;inset:0;z-index:6;pointer-events:none;display:none}
+#linePrev.on{display:block}
+
+/* ── HUD ── */
+#hud{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px)+8px);z-index:30;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;transition:opacity .3s,transform .3s}
+#hud.ui-hidden{opacity:0;pointer-events:none;transform:translateY(-8px)}
+.pill{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(–border);border-radius:999px;background:var(–glass);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);box-shadow:var(–shadow);font-size:11.5px;font-weight:600;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:all .4s}
+.dot.g{background:var(–green);box-shadow:0 0 8px var(–green)}
+.dot.y{background:var(–yellow);box-shadow:0 0 8px var(–yellow)}
+.dot.r{background:var(–red);box-shadow:0 0 8px var(–red)}
+#hudRight{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+#qPill{pointer-events:auto;display:flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(–border);border-radius:999px;background:var(–glass);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);box-shadow:var(–shadow)}
+#qPill label{font-size:10px;color:var(–muted)}
+#qOpV{font-size:11px;color:var(–accent);font-weight:900;min-width:30px;text-align:center}
+#qOpR{width:64px;accent-color:var(–accent);height:18px;cursor:pointer}
+#modeBadge{pointer-events:none;display:none;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;background:var(–glass);border:1px solid var(–border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-size:10.5px;font-weight:800}
+#modeBadge.on{display:inline-flex}
+
+/* ── ZOOM / SNAP ── */
+#zoomBadge{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px)+68px);z-index:30;pointer-events:none;padding:4px 14px;border-radius:999px;background:var(–glass);border:1px solid var(–border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-size:11px;font-weight:900;color:var(–accent2);white-space:nowrap;opacity:0;transition:opacity .28s}
+#zoomBadge.on{opacity:1}
+#snapFlash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;pointer-events:none;padding:9px 20px;border-radius:14px;background:var(–glass);border:1px solid var(–border-a);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);font-size:13px;font-weight:800;color:var(–accent);white-space:nowrap;opacity:0;transition:opacity .18s}
+#snapFlash.on{opacity:1}
+
+/* ── MINI HUD (shown when UI hidden) ── */
+#miniHud{
+position:fixed;left:50%;transform:translateX(-50%);
+bottom:calc(env(safe-area-inset-bottom,0px)+18px);
+z-index:50;display:flex;align-items:center;gap:6px;
+padding:6px 14px;border:1px solid var(–border);border-radius:999px;
+background:var(–glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+box-shadow:var(–shadow);pointer-events:none;
+opacity:0;transition:opacity .3s;
+}
+#miniHud.on{opacity:1}
+#miniHud span{font-size:10.5px;font-weight:700;color:var(–muted)}
+#miniHud strong{font-size:10.5px;font-weight:900;color:var(–accent)}
+.miniSep{width:1px;height:12px;background:rgba(255,255,255,.12)}
+
+/* ── FAB RAIL ── */
+#fabRail{position:fixed;right:12px;z-index:40;display:flex;flex-direction:column;gap:7px;align-items:center;transition:opacity .3s,transform .3s}
+#fabRail.ui-hidden{opacity:0;pointer-events:none;transform:translateX(18px)}
+.fab{width:48px;height:48px;border-radius:16px;background:var(–glass);border:1px solid var(–border);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:var(–shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;position:relative;transition:transform .14s,background .2s,border-color .2s,box-shadow .2s}
+.fab:active{transform:scale(.87)}
+.fab.on{background:rgba(63,255,197,.14);border-color:rgba(63,255,197,.38);box-shadow:0 0 22px rgba(63,255,197,.15),var(–shadow)}
+.fab.draw-on{background:rgba(251,113,133,.14);border-color:rgba(251,113,133,.38);box-shadow:0 0 22px rgba(251,113,133,.12),var(–shadow)}
+.fab.lock-on{background:rgba(167,139,250,.18);border-color:rgba(167,139,250,.45)}
+.fab.trace-on{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.38);box-shadow:0 0 22px rgba(251,191,36,.12),var(–shadow)}
+@keyframes lkPulse{0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,.4),var(–shadow)}65%{box-shadow:0 0 0 8px rgba(167,139,250,0),var(–shadow)}}
+.fab.lock-on{animation:lkPulse 2.4s infinite}
+.fab::after{content:attr(data-tip);position:absolute;right:calc(100% + 8px);background:var(–glass);border:1px solid var(–border);border-radius:9px;padding:5px 10px;font-size:10.5px;font-weight:700;color:var(–text);white-space:nowrap;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);opacity:0;pointer-events:none;transition:opacity .2s;font-family:‘IBM Plex Sans Arabic’,sans-serif}
+.fab:hover::after{opacity:1}
+
+/* ── DRAW TOOLBAR ── */
+#drawBar{position:fixed;left:12px;z-index:40;display:none;flex-direction:column;gap:7px;align-items:center;transition:opacity .3s,transform .3s}
+#drawBar.on{display:flex}
+/* compact = horizontal strip at top when UI hidden */
+#drawBar.compact{flex-direction:row;flex-wrap:nowrap;left:12px;top:calc(env(safe-area-inset-top,0px)+8px);bottom:auto!important;gap:6px;align-items:center}
+#drawBar.compact .dSep{display:none}
+#drawBar.compact .vSliderWrap{display:none}
+#drawBar.compact #colorPresets{flex-direction:row;gap:4px}
+#drawBar.compact #colorPresets .cpDot{width:18px;height:18px}
+#drawBar.compact #brushPreviewWrap{display:none}
+
+.dBtn{width:42px;height:42px;border-radius:13px;background:var(–glass);border:1px solid var(–border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:var(–shadow);position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;transition:all .14s}
+.dBtn:active{transform:scale(.87)}
+.dBtn.on{background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.4)}
+.dBtn.danger{color:var(–red)}
+.badge{position:absolute;top:-4px;left:-4px;width:16px;height:16px;border-radius:50%;background:var(–accent2);color:#000;font-size:8.5px;font-weight:900;display:flex;align-items:center;justify-content:center;pointer-events:none}
+
+/* brush preview dot */
+#brushPreviewWrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+#brushPreviewDot{border-radius:50%;background:var(–accent3);transition:width .15s,height .15s,background .2s;flex-shrink:0;box-shadow:0 0 8px rgba(251,113,133,.4)}
+#brushPreviewLabel{font-size:9px;color:var(–muted);font-weight:700}
+
+#colorSwatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.28);transition:transform .14s,box-shadow .2s;flex-shrink:0}
+#colorSwatch:active{transform:scale(.87)}
+#colorPickerHidden{position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0}
+.vSliderWrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.vSlider{writing-mode:vertical-lr;direction:rtl;transform:rotate(180deg);height:80px;width:36px;cursor:pointer}
+.vSliderDisp{font-size:9.5px;color:var(–muted);font-weight:700}
+#brushSlider{accent-color:var(–accent3)}
+#brushAlphaSlider{accent-color:var(–accent4);height:64px}
+#colorPresets{display:flex;flex-direction:column;gap:5px;align-items:center}
+.cpDot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:1.5px solid rgba(255,255,255,.15);transition:transform .14s;flex-shrink:0}
+.cpDot:active{transform:scale(.85)}
+.cpDot.sel{border-color:#fff;border-width:2px;box-shadow:0 0 8px rgba(255,255,255,.4)}
+.dSep{width:28px;height:1px;background:rgba(255,255,255,.1);flex-shrink:0}
+
+/* ── RESTORE BTN ── */
+#restoreBtn{position:fixed;z-index:50;right:12px;width:36px;height:36px;border-radius:50%;background:var(–glass);border:1px solid var(–border-a);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 0 16px rgba(63,255,197,.2),var(–shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;transform:scale(.7)}
+#restoreBtn.on{opacity:1;pointer-events:auto;transform:scale(1)}
+
+/* ── PANEL ── */
+#panel{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px)+8px);z-index:35;border:1px solid var(–border);border-radius:22px;background:var(–glass);backdrop-filter:blur(38px);-webkit-backdrop-filter:blur(38px);box-shadow:var(–shadow);transition:transform .38s cubic-bezier(.28,0,.14,1),opacity .32s;overflow:hidden;max-height:60vh}
+#panel.off{transform:translateY(calc(100% + 30px));opacity:0;pointer-events:none}
+#panel.ui-hidden{transform:translateY(calc(100% + 30px));opacity:0;pointer-events:none}
+#panelInner{padding:10px 13px 14px;overflow-y:auto;max-height:inherit}
+/* drag handle area */
+#panelHandle{width:34px;height:4px;border-radius:2px;background:var(–glass3);margin:0 auto 10px;cursor:grab;transition:background .2s}
+#panelHandle:hover{background:rgba(63,255,197,.3)}
+
+/* ── TABS (swipeable) ── */
+#tabs{display:flex;gap:2px;margin-bottom:12px;background:rgba(0,0,0,.3);border-radius:12px;padding:3px;position:relative}
+.tab{flex:1;text-align:center;padding:7px 2px;border-radius:9px;font-size:11px;font-weight:700;cursor:pointer;color:var(–muted);transition:background .2s,color .2s;position:relative;z-index:1}
+.tab.on{color:var(–text)}
+/* sliding pill indicator */
+#tabIndicator{position:absolute;top:3px;bottom:3px;border-radius:9px;background:var(–glass3);transition:left .22s cubic-bezier(.38,0,.22,1),width .22s cubic-bezier(.38,0,.22,1);pointer-events:none;z-index:0}
+.tc{display:none}.tc.on{display:block}
+
+/* ── BUTTONS ── */
+.row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;align-items:center}
+.row:last-child{margin-bottom:0}
+.btn{appearance:none;border:1px solid var(–border);background:var(–glass2);color:var(–text);border-radius:10px;padding:8px 11px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;transition:background .15s,transform .1s,border-color .15s,color .15s;line-height:1}
+.btn:active{transform:scale(.92)}
+.btn.on{background:rgba(63,255,197,.11);border-color:var(–border-a);color:var(–accent)}
+.btn.v2{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.3);color:var(–accent2)}
+.btn.v2.on{background:rgba(167,139,250,.2);border-color:rgba(167,139,250,.5)}
+.btn.v3{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:var(–yellow)}
+.btn.v3.on{background:rgba(251,191,36,.2);border-color:rgba(251,191,36,.5)}
+.btn.danger{color:var(–red);border-color:rgba(244,63,94,.22)}
+.fileBtn{position:relative;overflow:hidden;border-color:var(–border-a);background:rgba(63,255,197,.07);color:var(–accent)}
+.fileBtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.opPresets{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.opBtn{appearance:none;border:1px solid var(–border);background:var(–glass2);color:var(–muted);border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s}
+.opBtn:active{transform:scale(.92)}
+.opBtn.on{background:rgba(63,255,197,.11);border-color:var(–border-a);color:var(–accent)}
+
+/* ── SLIDERS ── */
+.sRow{display:flex;align-items:center;gap:9px;margin-top:9px}
+.sLbl{min-width:60px;font-size:10.5px;color:var(–muted);text-align:right;font-weight:600}
+.sVal{min-width:40px;font-size:11px;color:var(–accent);font-weight:900;font-variant-numeric:tabular-nums}
+input[type=range]{flex:1;accent-color:var(–accent);height:20px;cursor:pointer}
+
+/* ── FILTER ── */
+.fGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:3px}
+.fPill{padding:9px 3px;border:1px solid var(–border);border-radius:10px;font-size:10.5px;font-weight:700;cursor:pointer;color:var(–muted);background:var(–glass2);text-align:center;transition:all .18s;font-family:inherit}
+.fPill.on{border-color:rgba(167,139,250,.5);color:var(–accent2);background:rgba(167,139,250,.12)}
+
+/* ── MISC ── */
+.hint{margin-top:8px;font-size:10.5px;color:var(–muted);line-height:1.8;background:rgba(255,255,255,.025);border-radius:10px;padding:7px 11px}
+.secTitle{font-size:10px;font-weight:800;color:var(–muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;margin-top:12px}
+.secTitle:first-child{margin-top:2px}
+
+/* ── FLASH / TOAST ── */
+#flash{position:fixed;inset:0;z-index:80;background:#fff;opacity:0;pointer-events:none;transition:opacity .06s}
+#flash.pop{opacity:.65}
+#toast{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(110px);z-index:90;padding:10px 18px;border:1px solid var(–border-a);border-radius:12px;background:var(–glass);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);box-shadow:0 0 28px rgba(63,255,197,.1),var(–shadow);font-size:12.5px;font-weight:700;color:var(–accent);pointer-events:none;white-space:nowrap;opacity:0;transition:transform .32s cubic-bezier(.28,0,.14,1),opacity .28s;display:flex;align-items:center;gap:8px}
+#toast.on{transform:translateX(-50%) translateY(calc(-1*(env(safe-area-inset-bottom,0px)+84px)));opacity:1}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#030610}
+.lBg{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.lBg::before{content:’’;position:absolute;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(63,255,197,.07),transparent 70%);top:-120px;left:-160px;animation:lpulse 5s ease-in-out infinite alternate}
+.lBg::after{content:’’;position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.07),transparent 70%);bottom:-100px;right:-130px;animation:lpulse 5s ease-in-out 2.5s infinite alternate}
+@keyframes lpulse{0%{opacity:.4;transform:scale(1)}100%{opacity:1;transform:scale(1.2)}}
+#lBox{position:relative;text-align:center;max-width:320px;width:92%;padding:36px 26px 28px;border:1px solid rgba(63,255,197,.13);border-radius:28px;background:rgba(4,7,16,.95);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:0 0 90px rgba(63,255,197,.06),var(–shadow);animation:lIn .55s cubic-bezier(.28,0,.14,1) both}
+@keyframes lIn{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}
+.lIcon{width:64px;height:64px;border-radius:18px;margin:0 auto 18px;background:linear-gradient(135deg,rgba(63,255,197,.2),rgba(167,139,250,.2));border:1px solid rgba(63,255,197,.2);display:flex;align-items:center;justify-content:center;font-size:28px;animation:lFloat 3.2s ease-in-out infinite}
+@keyframes lFloat{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-6px) rotate(-3deg)}}
+#lBox h1{font-size:32px;font-weight:900;letter-spacing:-1.5px;background:linear-gradient(120deg,var(–accent) 20%,var(–accent2) 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:5px}
+.lSub{font-size:10px;letter-spacing:3.5px;text-transform:uppercase;color:var(–accent);opacity:.5;font-weight:700;margin-bottom:14px}
+#lBox p{color:var(–muted);font-size:13px;line-height:1.8;margin-bottom:20px}
+.lFeats{display:flex;gap:6px;justify-content:center;margin-bottom:22px;flex-wrap:wrap}
+.lFeat{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(–border);font-size:10px;color:var(–muted)}
+#startBtn{display:inline-flex;align-items:center;gap:9px;padding:14px 32px;border-radius:14px;background:linear-gradient(120deg,var(–accent),var(–accent2));color:#030712;font-weight:900;font-size:14px;font-family:inherit;cursor:pointer;border:none;box-shadow:0 12px 38px rgba(63,255,197,.32);transition:opacity .2s,transform .15s}
+#startBtn:active{opacity:.85;transform:scale(.96)}
+#errMsg{margin-top:14px;color:var(–red);font-size:11.5px;line-height:1.6}
+</style>
+
+</head>
+<body>
+
+<!-- LOADER -->
+
+<div id="loader">
+  <div class="lBg"></div>
+  <div id="lBox">
+    <div class="lIcon">✏️</div>
+    <h1>AR Trace</h1>
+    <div class="lSub">Pro • مجاني 100%</div>
+    <p>ضع الصورة فوق الكاميرا وتتبّعها بدقة احترافية.<br>يعمل عبر HTTPS أو localhost.</p>
+    <div class="lFeats">
+      <div class="lFeat">🖊️ رسم + خط</div>
+      <div class="lFeat">🔦 تتبّع</div>
+      <div class="lFeat">👁 إخفاء كامل</div>
+      <div class="lFeat">↩↪ سحب للتراجع</div>
+      <div class="lFeat">📐 شبكة</div>
+      <div class="lFeat">📸 حفظ</div>
+    </div>
+    <button id="startBtn">📷 تشغيل الكاميرا</button>
+    <div id="errMsg"></div>
+  </div>
+</div>
+
+<!-- STAGE -->
+
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+  <canvas id="guideCvs"></canvas>
+  <div id="overlayOuter"><div id="overlayInner"><img id="overlayImg" alt=""/></div></div>
+  <canvas id="linePrev" id="linePrev"></canvas>
+  <canvas id="drawCvs"></canvas>
+  <div id="crosshair"><div class="crossRing"></div></div>
+  <div id="ruler">
+    <div id="rulerH"><span class="rulerLbl" id="rulerHL" style="top:-20px;right:8px">Y: 0px</span></div>
+    <div id="rulerV"><span class="rulerLbl" id="rulerVL" style="bottom:8px;left:8px">X: 0px</span></div>
+  </div>
+  <div id="vignette"></div>
+  <div id="scanLines"></div>
+  <div id="traceOverlay"></div>
+</div>
+
+<canvas id="linePrevCvs" style="position:fixed;inset:0;z-index:6;pointer-events:none;display:none"></canvas>
+
+<div id="brushCursor"></div>
+<div id="flash"></div>
+<div id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+<div id="zoomBadge"></div>
+<div id="snapFlash"></div>
+<div id="miniHud"><span>شفافية</span><strong id="miniOpV">55%</strong><div class="miniSep"></div><span>تكبير</span><strong id="miniZoomV">100%</strong></div>
+
+<!-- LEVEL -->
+
+<div id="levelWrap">
+  <span style="font-size:11px">📐</span>
+  <div id="levelBar"><div id="levelFill"></div></div>
+  <div id="levelText">0°</div>
+</div>
+
+<!-- HUD -->
+
+<div id="hud">
+  <div style="display:flex;flex-direction:column;gap:5px">
+    <div class="pill"><div class="dot y" id="camDot"></div><span id="camLbl">الكاميرا</span></div>
+    <div class="pill"><span id="statusTxt">جاهز</span></div>
+  </div>
+  <div id="hudRight">
+    <div id="qPill">
+      <label>شفافية</label>
+      <input id="qOpR" type="range" min="0" max="1" step=".02" value=".55"/>
+      <span id="qOpV">55%</span>
+    </div>
+    <div id="modeBadge"></div>
+  </div>
+</div>
+
+<!-- FAB RAIL -->
+
+<div id="fabRail">
+  <div class="fab" id="panelFab" data-tip="الأدوات">⚙️</div>
+  <div class="fab" id="hideUIFab" data-tip="إخفاء الواجهة">👁</div>
+  <div class="fab" id="lockFab" data-tip="تثبيت الصورة">🔓</div>
+  <div class="fab" id="drawFab" data-tip="وضع الرسم">🖊️</div>
+  <div class="fab" id="traceFab" data-tip="وضع التتبّع">🔦</div>
+  <div class="fab" id="gridFab" data-tip="شبكة الإرشاد">⊞</div>
+  <div class="fab" id="crossFab" data-tip="المحاور">✛</div>
+  <div class="fab" id="rulerFab" data-tip="المسطرة">📏</div>
+  <div class="fab" id="vigFab" data-tip="تعتيم الحواف">◉</div>
+  <div class="fab" id="levelFab" data-tip="الميزان">📐</div>
+  <div class="fab" id="camFlipFab" data-tip="تبديل الكاميرا">🔄</div>
+  <div class="fab" id="snapFab" data-tip="لقطة شاشة">📸</div>
+</div>
+
+<!-- RESTORE -->
+
+<div id="restoreBtn" title="إظهار الواجهة">👁</div>
+
+<!-- DRAW TOOLBAR -->
+
+<div id="drawBar">
+  <div class="dBtn on" id="penBtn" title="قلم">✏️</div>
+  <div class="dBtn" id="lineBtn" title="خط مستقيم">╱</div>
+  <div class="dBtn" id="eraserBtn" title="ممحاة">🧹</div>
+  <div class="dSep"></div>
+  <div class="dBtn" id="undoBtn" title="تراجع">↩</div>
+  <div class="dBtn" id="redoBtn" title="إعادة">↪</div>
+  <div class="dBtn danger" id="clearBtn" title="مسح">✕</div>
+  <div class="dSep"></div>
+  <div id="brushPreviewWrap">
+    <div id="brushPreviewDot"></div>
+    <div id="brushPreviewLabel">4px</div>
+  </div>
+  <div id="colorSwatch"></div>
+  <input id="colorPickerHidden" type="color" value="#3fffc5"/>
+  <div id="colorPresets"></div>
+  <div class="dSep"></div>
+  <div class="vSliderWrap">
+    <div class="vSliderDisp" id="brushSizeDisp">4px</div>
+    <input class="vSlider" id="brushSlider" type="range" min="1" max="40" step=".5" value="4"/>
+  </div>
+  <div class="vSliderWrap">
+    <div class="vSliderDisp" id="brushAlphaDisp">100%</div>
+    <input class="vSlider" id="brushAlphaSlider" type="range" min="5" max="100" step="1" value="100"/>
+  </div>
+</div>
+
+<!-- BOTTOM PANEL -->
+
+<div id="panel">
+  <div id="panelInner">
+    <div id="panelHandle"></div>
+    <div id="tabs">
+      <div id="tabIndicator"></div>
+      <div class="tab on" data-t="img">الصورة</div>
+      <div class="tab" data-t="adj">الضبط</div>
+      <div class="tab" data-t="fil">الفلاتر</div>
+      <div class="tab" data-t="grd">الشبكة</div>
+    </div>
+
+```
+<!-- IMAGE TAB -->
+<div class="tc on" id="tc-img">
+  <div class="row">
+    <label class="btn fileBtn">📂 اختر صورة<input id="fileIn" type="file" accept="image/*"/></label>
+    <label class="btn" style="border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.07);color:var(--accent2);position:relative;overflow:hidden">
+      📷 التقط<input id="capIn" type="file" accept="image/*" capture="environment" style="position:absolute;inset:0;opacity:0;cursor:pointer"/>
+    </label>
+    <button class="btn" id="fitBtn">⟲ ملاءمة</button>
+    <button class="btn" id="ctrBtn">⊕ توسيط</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="fhBtn">↔ أفقي</button>
+    <button class="btn" id="fvBtn">↕ عمودي</button>
+    <button class="btn" id="r90Btn">↻ 90°</button>
+    <button class="btn" id="r45Btn">↻ 45°</button>
+    <button class="btn v2" id="snapRotBtn">📐 ضبط</button>
+    <button class="btn danger" id="resetBtn">✕ إعادة</button>
+  </div>
+  <div class="secTitle">شفافية سريعة</div>
+  <div class="opPresets">
+    <button class="opBtn" data-op=".15">15%</button>
+    <button class="opBtn" data-op=".3">30%</button>
+    <button class="opBtn" data-op=".5">50%</button>
+    <button class="opBtn" data-op=".65">65%</button>
+    <button class="opBtn" data-op=".8">80%</button>
+    <button class="opBtn" data-op="1">100%</button>
+  </div>
+  <div class="hint">
+    👆 إصبع — تحريك &emsp; ✌️ إصبعان — تكبير + تدوير<br>
+    👆👆 ضغطتان — توسيط &emsp; 👁 إخفاء الواجهة للرسم الكامل<br>
+    ✌️← → سحب إصبعين على اللوحة — تراجع / إعادة
+  </div>
+</div>
+
+<!-- ADJUST TAB -->
+<div class="tc" id="tc-adj">
+  <div class="secTitle">الصورة</div>
+  <div class="sRow"><div class="sLbl">الشفافية</div><input id="opR" type="range" min="0" max="1" step=".01" value=".55"/><div class="sVal" id="opV">55%</div></div>
+  <div class="sRow"><div class="sLbl">الحجم</div><input id="szR" type="range" min="40" max="2200" step="1" value="320"/><div class="sVal" id="szV">320px</div></div>
+  <div class="sRow"><div class="sLbl">الدوران</div><input id="rotR" type="range" min="-180" max="180" step=".5" value="0"/><div class="sVal" id="rotV">0°</div></div>
+  <div class="secTitle">الألوان</div>
+  <div class="sRow"><div class="sLbl">السطوع</div><input id="brR" type="range" min=".1" max="3" step=".05" value="1"/><div class="sVal" id="brV">100%</div></div>
+  <div class="sRow"><div class="sLbl">التباين</div><input id="coR" type="range" min=".1" max="3" step=".05" value="1"/><div class="sVal" id="coV">100%</div></div>
+  <div class="sRow"><div class="sLbl">التشبع</div><input id="saR" type="range" min="0" max="3" step=".05" value="1"/><div class="sVal" id="saV">100%</div></div>
+  <div class="sRow"><div class="sLbl">درجة اللون</div><input id="huR" type="range" min="-180" max="180" step="1" value="0"/><div class="sVal" id="huV">0°</div></div>
+  <div class="sRow"><div class="sLbl">الضبابية</div><input id="blR" type="range" min="0" max="10" step=".1" value="0"/><div class="sVal" id="blV">0</div></div>
+  <div class="secTitle">الكاميرا</div>
+  <div class="sRow"><div class="sLbl">السطوع</div><input id="camBrR" type="range" min=".3" max="2.5" step=".05" value="1"/><div class="sVal" id="camBrV">×1.0</div></div>
+</div>
+
+<!-- FILTER TAB -->
+<div class="tc" id="tc-fil">
+  <div class="secTitle">فلاتر الصورة</div>
+  <div class="fGrid">
+    <div class="fPill on" data-f="none">بدون</div>
+    <div class="fPill" data-f="gray">رمادي</div>
+    <div class="fPill" data-f="invert">معكوس</div>
+    <div class="fPill" data-f="sepia">سيبيا</div>
+    <div class="fPill" data-f="edge">حواف</div>
+    <div class="fPill" data-f="hue">ألوان</div>
+    <div class="fPill" data-f="warm">دافئ</div>
+    <div class="fPill" data-f="cold">بارد</div>
+    <div class="fPill" data-f="sketch">رسم</div>
+    <div class="fPill" data-f="xray">أشعة</div>
+    <div class="fPill" data-f="night">ليلي</div>
+    <div class="fPill" data-f="poster">ملصق</div>
+  </div>
+  <div class="sRow" style="margin-top:10px">
+    <div class="sLbl">شدّة الفلتر</div>
+    <input id="faR" type="range" min="0" max="100" step="1" value="100"/>
+    <div class="sVal" id="faV">100%</div>
+  </div>
+</div>
+
+<!-- GUIDE TAB -->
+<div class="tc" id="tc-grd">
+  <div class="secTitle">نوع الشبكة</div>
+  <div class="row">
+    <button class="btn on" id="gnBtn">بلا</button>
+    <button class="btn" id="g3Btn">ثلث×ثلث</button>
+    <button class="btn" id="g4Btn">ربع×ربع</button>
+    <button class="btn v2" id="ggBtn">✦ ذهبي</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="gdBtn">⟋ أقطار</button>
+    <button class="btn" id="gcBtn">◯ دوائر</button>
+    <button class="btn" id="gtBtn">△ مثلثات</button>
+    <button class="btn v3" id="slBtn">〰 خطوط مسح</button>
+  </div>
+  <div class="sRow">
+    <div class="sLbl">شفافية الشبكة</div>
+    <input id="gaR" type="range" min="5" max="100" step="1" value="28"/>
+    <div class="sVal" id="gaV">28%</div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+
+/* ── DOM ── */
+const camera=$('camera'),overlayOuter=$('overlayOuter'),overlayInner=$('overlayInner'),
+  overlayImg=$('overlayImg'),fileIn=$('fileIn'),capIn=$('capIn'),
+  loader=$('loader'),errMsg=$('errMsg'),camDot=$('camDot'),camLbl=$('camLbl'),
+  statusTxt=$('statusTxt'),startBtn=$('startBtn'),
+  toastEl=$('toast'),toastIcon=$('toastIcon'),toastMsg=$('toastMsg'),flashEl=$('flash'),
+  fitBtn=$('fitBtn'),ctrBtn=$('ctrBtn'),fhBtn=$('fhBtn'),fvBtn=$('fvBtn'),
+  r90Btn=$('r90Btn'),r45Btn=$('r45Btn'),snapRotBtn=$('snapRotBtn'),resetBtn=$('resetBtn'),
+  panelFab=$('panelFab'),panel=$('panel'),fabRail=$('fabRail'),
+  hideUIFab=$('hideUIFab'),restoreBtn=$('restoreBtn'),
+  lockFab=$('lockFab'),drawFab=$('drawFab'),traceFab=$('traceFab'),
+  gridFab=$('gridFab'),crossFab=$('crossFab'),rulerFab=$('rulerFab'),
+  vigFab=$('vigFab'),levelFab=$('levelFab'),camFlipFab=$('camFlipFab'),snapFab=$('snapFab'),
+  drawBar=$('drawBar'),penBtn=$('penBtn'),lineBtn=$('lineBtn'),eraserBtn=$('eraserBtn'),
+  undoBtn=$('undoBtn'),redoBtn=$('redoBtn'),clearBtn=$('clearBtn'),
+  colorSwatch=$('colorSwatch'),colorPickerHidden=$('colorPickerHidden'),
+  brushSlider=$('brushSlider'),brushSizeDisp=$('brushSizeDisp'),
+  brushAlphaSlider=$('brushAlphaSlider'),brushAlphaDisp=$('brushAlphaDisp'),
+  brushPreviewDot=$('brushPreviewDot'),brushPreviewLabel=$('brushPreviewLabel'),
+  colorPresetsEl=$('colorPresets'),
+  drawCvs=$('drawCvs'),guideCvs=$('guideCvs'),linePrevCvs=$('linePrevCvs'),
+  crossEl=$('crosshair'),rulerEl=$('ruler'),rulerH=$('rulerH'),rulerV=$('rulerV'),
+  rulerHL=$('rulerHL'),rulerVL=$('rulerVL'),
+  vigEl=$('vignette'),scanEl=$('scanLines'),traceEl=$('traceOverlay'),
+  brushCursor=$('brushCursor'),modeBadge=$('modeBadge'),hud=$('hud'),
+  zoomBadge=$('zoomBadge'),snapFlash=$('snapFlash'),
+  miniHud=$('miniHud'),miniOpV=$('miniOpV'),miniZoomV=$('miniZoomV'),
+  levelWrap=$('levelWrap'),levelFill=$('levelFill'),levelText=$('levelText'),
+  tabIndicator=$('tabIndicator'),
+  qOpR=$('qOpR'),qOpV=$('qOpV'),
+  opR=$('opR'),szR=$('szR'),rotR=$('rotR'),brR=$('brR'),coR=$('coR'),
+  saR=$('saR'),huR=$('huR'),blR=$('blR'),faR=$('faR'),gaR=$('gaR'),camBrR=$('camBrR'),
+  opV=$('opV'),szV=$('szV'),rotV=$('rotV'),brV=$('brV'),coV=$('coV'),
+  saV=$('saV'),huV=$('huV'),blV=$('blV'),faV=$('faV'),gaV=$('gaV'),camBrV=$('camBrV');
+
+/* ── State ── */
+const S={
+  cx:innerWidth/2,cy:innerHeight/2,scale:1,rot:0,baseW:320,baseH:320,
+  opacity:.55,bright:1,contrast:1,sat:1,hue:0,blur:0,
+  flipH:false,flipV:false,locked:false,
+  filter:'none',fAmt:1,hasImg:false,
+  guideMode:'none',guideAlpha:.28,
+  camFacing:'environment',camStream:null,
+  drawMode:false,drawTool:'pen',drawColor:'#3fffc5',drawSize:4,drawAlpha:1,
+  traceMode:false,uiHidden:false,
+  rulerHY:innerHeight/2,rulerVX:innerWidth/2,
+};
+
+/* ── Render loop ── */
+let rafId=null;
+function sched(){ if(!rafId) rafId=requestAnimationFrame(doRender); }
+function doRender(){
+  rafId=null;
+  const{cx,cy,scale,rot,baseW,opacity,bright,contrast,sat,hue,blur,flipH,flipV,filter,fAmt}=S;
+  overlayOuter.style.transform=`translate(${cx-baseW/2}px,${cy-S.baseH/2}px)`;
+  overlayOuter.style.opacity=opacity;
+  overlayInner.style.width=baseW+'px';
+  overlayInner.style.transform=`scale(${scale}) rotate(${rot}deg)`;
+  overlayImg.style.transform=(flipH||flipV)?`scale(${flipH?-1:1},${flipV?-1:1})`:'none';
+  let f=`brightness(${bright}) contrast(${contrast}) saturate(${sat}) hue-rotate(${hue}deg)`;
+  if(blur>0) f+=` blur(${blur}px)`;
+  const a=fAmt;
+  if(filter==='gray')   f+=` grayscale(${a})`;
+  else if(filter==='invert') f+=` invert(${a})`;
+  else if(filter==='sepia')  f+=` sepia(${a})`;
+  else if(filter==='hue')    f+=` hue-rotate(${Math.round(a*360)}deg)`;
+  else if(filter==='edge')   f+=` contrast(${1+a*12}) grayscale(1) brightness(1.2)`;
+  else if(filter==='warm')   f+=` sepia(${a*.5}) saturate(${1+a*.8}) hue-rotate(-14deg)`;
+  else if(filter==='cold')   f+=` saturate(${1-a*.35}) hue-rotate(${a*32}deg) brightness(${1+a*.12})`;
+  else if(filter==='sketch') f+=` grayscale(1) contrast(${1+a*5.5}) brightness(${1+a*.45})`;
+  else if(filter==='xray')   f+=` invert(${a}) grayscale(${a}) contrast(${1+a*.6})`;
+  else if(filter==='night')  f+=` hue-rotate(${a*110}deg) saturate(${1+a*1.2}) brightness(${1-a*.28})`;
+  else if(filter==='poster') f+=` saturate(${1+a*2.2}) contrast(${1+a*1.6})`;
+  overlayImg.style.filter=f;
+  // update mini HUD
+  miniOpV.textContent=Math.round(S.opacity*100)+'%';
+  miniZoomV.textContent=Math.round(S.scale*100)+'%';
+}
+function setS(p){ Object.assign(S,p); sched(); }
+
+/* ── Helpers ── */
+function status(t){ statusTxt.textContent=t; }
+let tTimer=null;
+function toast(msg,icon,col,dur=1900){
+  toastIcon.textContent=icon||''; toastMsg.textContent=msg;
+  toastEl.style.color=col||'var(--accent)';
+  toastEl.classList.add('on'); clearTimeout(tTimer);
+  tTimer=setTimeout(()=>toastEl.classList.remove('on'),dur);
+}
+function haptic(t){ if(!navigator.vibrate) return; navigator.vibrate(t==='light'?7:t==='med'?16:[15,8,15]); }
+let zbT=null;
+function showZoom(){ zoomBadge.textContent=Math.round(S.scale*100)+'%'; zoomBadge.classList.add('on'); clearTimeout(zbT); zbT=setTimeout(()=>zoomBadge.classList.remove('on'),1000); }
+let sfT=null;
+function snapMsg(msg){ snapFlash.textContent=msg; snapFlash.classList.add('on'); clearTimeout(sfT); sfT=setTimeout(()=>snapFlash.classList.remove('on'),750); }
+function setMode(label,color){ if(label){ modeBadge.textContent=label; modeBadge.style.color=color||'var(--accent)'; modeBadge.classList.add('on'); } else { modeBadge.classList.remove('on'); } }
+function updateMiniHud(){ miniOpV.textContent=Math.round(S.opacity*100)+'%'; miniZoomV.textContent=Math.round(S.scale*100)+'%'; }
+
+/* ── UI HIDE / SHOW ── */
+function hideUI(){
+  S.uiHidden=true;
+  hud.classList.add('ui-hidden');
+  fabRail.classList.add('ui-hidden');
+  panel.classList.add('ui-hidden');
+  miniHud.classList.add('on');
+  restoreBtn.classList.add('on');
+  positionRestoreBtn();
+  if(S.drawMode) drawBar.classList.add('compact');
+  haptic('light');
+}
+function showUI(){
+  S.uiHidden=false;
+  hud.classList.remove('ui-hidden');
+  fabRail.classList.remove('ui-hidden');
+  panel.classList.remove('ui-hidden');
+  miniHud.classList.remove('on');
+  restoreBtn.classList.remove('on');
+  drawBar.classList.remove('compact');
+  if(S.drawMode) positionFabs();
+  haptic('light');
+}
+function positionRestoreBtn(){
+  const sb=getSafeBottom();
+  restoreBtn.style.bottom=(sb+20)+'px';
+}
+hideUIFab.addEventListener('click',()=>{ S.uiHidden?showUI():hideUI(); });
+restoreBtn.addEventListener('click',()=>showUI());
+
+// Double-tap on camera background toggles UI
+let stageTapLast=0;
+document.getElementById('stage').addEventListener('pointerdown',e=>{
+  if(e.target!==camera&&e.target!==document.getElementById('stage')&&!e.target.classList.contains('crossRing')) return;
+  const now=Date.now();
+  if(now-stageTapLast<280){ S.uiHidden?showUI():hideUI(); }
+  stageTapLast=now;
+},{passive:true});
+
+/* ── SLIDING TAB INDICATOR ── */
+function updateTabIndicator(){
+  const tabs=document.querySelectorAll('.tab');
+  const active=[...tabs].findIndex(t=>t.classList.contains('on'));
+  if(active<0) return;
+  const tab=tabs[active];
+  tabIndicator.style.left=tab.offsetLeft+'px';
+  tabIndicator.style.width=tab.offsetWidth+'px';
+}
+
+/* ── SWIPEABLE TABS ── */
+let tabSwipeX=null;
+const tabsEl=$('tabs');
+tabsEl.addEventListener('pointerdown',e=>{ tabSwipeX=e.clientX; },{passive:true});
+tabsEl.addEventListener('pointerup',e=>{
+  if(tabSwipeX===null) return;
+  const dx=e.clientX-tabSwipeX; tabSwipeX=null;
+  if(Math.abs(dx)<30) return; // not a swipe
+  const tabs=[...document.querySelectorAll('.tab')];
+  const cur=tabs.findIndex(t=>t.classList.contains('on'));
+  const next=dx<0?Math.min(tabs.length-1,cur+1):Math.max(0,cur-1);
+  if(next!==cur) tabs[next].click();
+},{passive:true});
+
+/* ── PANEL DRAG TO DISMISS ── */
+let panelDragY=null,panelOpen=true;
+const panelHandle=$('panelHandle');
+panelHandle.addEventListener('pointerdown',e=>{
+  panelDragY={start:e.clientY,startH:panel.offsetHeight};
+  panelHandle.setPointerCapture(e.pointerId);
+},{passive:false});
+panelHandle.addEventListener('pointermove',e=>{
+  if(!panelDragY) return;
+  const dy=e.clientY-panelDragY.start;
+  if(dy>40){ panelFab.click(); panelDragY=null; } // swipe down = close
+},{passive:true});
+panelHandle.addEventListener('pointerup',()=>{ panelDragY=null; },{passive:true});
+
+/* ── COLOR PRESETS ── */
+const PRESETS=['#3fffc5','#a78bfa','#fb7185','#fbbf24','#60a5fa','#ffffff','#000000','#34d399','#f97316'];
+function buildPresets(){
+  PRESETS.forEach(c=>{
+    const d=document.createElement('div'); d.className='cpDot'; d.style.background=c;
+    d.addEventListener('click',()=>{ setDrawColor(c); switchTool('pen'); haptic('light'); });
+    colorPresetsEl.appendChild(d);
+  });
+}
+function setDrawColor(c){
+  S.drawColor=c; colorSwatch.style.background=c; colorPickerHidden.value=c;
+  colorPresetsEl.querySelectorAll('.cpDot').forEach(d=>d.classList.toggle('sel',hexify(d.style.background)===c.toLowerCase()));
+  updateBrushPreview();
+}
+function hexify(rgb){ const m=rgb.match(/\d+/g); if(!m||m.length<3) return rgb.toLowerCase(); return '#'+m.slice(0,3).map(v=>parseInt(v).toString(16).padStart(2,'0')).join(''); }
+function switchTool(t){
+  S.drawTool=t;
+  penBtn.classList.toggle('on',t==='pen');
+  lineBtn.classList.toggle('on',t==='line');
+  eraserBtn.classList.toggle('on',t==='eraser');
+  brushCursor.className='brushCursor'+(S.drawMode?' on ':' ')+t;
+  updateBrushPreview();
+}
+function updateBrushPreview(){
+  const sz=Math.max(8,Math.min(40,S.drawSize));
+  brushPreviewDot.style.width=sz+'px'; brushPreviewDot.style.height=sz+'px';
+  brushPreviewDot.style.background=S.drawTool==='eraser'?'rgba(255,255,255,.2)':S.drawColor;
+  brushPreviewDot.style.boxShadow=S.drawTool==='eraser'?'none':`0 0 ${sz/2}px ${S.drawColor}66`;
+  brushPreviewLabel.textContent=Math.round(sz)+'px';
+}
+buildPresets(); setDrawColor(S.drawColor);
+
+/* ── TABS ── */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.tc').forEach(x=>x.classList.remove('on'));
+    tab.classList.add('on'); $('tc-'+tab.dataset.t).classList.add('on');
+    updateTabIndicator();
+  });
+});
+setTimeout(updateTabIndicator,100);
+
+/* ── OPACITY PRESETS ── */
+document.querySelectorAll('.opBtn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const v=parseFloat(b.dataset.op); setS({opacity:v});
+    opR.value=v; opV.textContent=Math.round(v*100)+'%';
+    qOpR.value=v; qOpV.textContent=Math.round(v*100)+'%';
+    document.querySelectorAll('.opBtn').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); haptic('light'); updateMiniHud();
+  });
+});
+
+/* ── PANEL + FAB POSITIONING ── */
+let panelVis=true;
+const sbDiv=document.createElement('div');
+sbDiv.style.cssText='position:fixed;bottom:0;left:0;width:0;height:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden';
+document.body.appendChild(sbDiv);
+function getSafeBottom(){ return sbDiv.offsetHeight||0; }
+
+function positionFabs(){
+  if(S.uiHidden) return;
+  const sb=getSafeBottom();
+  const panH=panelVis?(panel.offsetHeight||0)+14:12;
+  const b=(panH+sb+4)+'px';
+  fabRail.style.bottom=b; drawBar.style.bottom=b;
+  levelWrap.style.bottom=(panH+sb+68)+'px';
+  positionRestoreBtn();
+}
+panelFab.addEventListener('click',()=>{
+  panelVis=!panelVis; panel.classList.toggle('off',!panelVis);
+  panelFab.textContent=panelVis?'⚙️':'☰';
+  haptic('light'); setTimeout(positionFabs,50);
+});
+window.addEventListener('resize',()=>{ positionFabs(); resizeCvs(); drawGuides(); positionRuler(); updateTabIndicator(); });
+setTimeout(positionFabs,150);
+
+/* ── CAMERA ── */
+startBtn.addEventListener('click',()=>startCam(false));
+camFlipFab.addEventListener('click',()=>{
+  S.camFacing=S.camFacing==='environment'?'user':'environment';
+  camera.classList.toggle('mirror',S.camFacing==='user');
+  haptic('light'); startCam(true);
+});
+async function startCam(restart=false){
+  if(!restart){ camDot.className='dot y'; camLbl.textContent='جاري…'; errMsg.textContent=''; }
+  if(S.camStream){ S.camStream.getTracks().forEach(t=>t.stop()); S.camStream=null; }
+  try{
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:S.camFacing},width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:60,min:24}},audio:false});
+    S.camStream=stream; camera.srcObject=stream;
+    await new Promise((res,rej)=>{ if(camera.readyState>=2){res();return;} camera.addEventListener('loadedmetadata',res,{once:true}); camera.addEventListener('error',rej,{once:true}); setTimeout(res,4000); });
+    try{ await camera.play(); }catch(_){}
+    if(!restart) loader.style.display='none';
+    camDot.className='dot g'; camLbl.textContent=S.camFacing==='user'?'📷 أمامية':'📷 خلفية';
+    status('جاهز'); if(restart) toast(S.camFacing==='user'?'كاميرا أمامية':'كاميرا خلفية','🔄');
+  }catch(e){
+    camDot.className='dot r'; camLbl.textContent='خطأ';
+    if(!restart) errMsg.textContent='تعذّر تشغيل الكاميرا — تأكد من الإذن و HTTPS';
+    console.error(e);
+  }
+}
+camBrR.addEventListener('input',()=>{ const v=parseFloat(camBrR.value); camBrV.textContent='×'+v.toFixed(1); camera.style.filter=v===1?'none':'brightness('+v+')'; });
+
+/* ── IMAGE LOADING ── */
+function loadImg(file){ if(!file) return; overlayImg.src=URL.createObjectURL(file); status('تحميل…'); }
+fileIn.addEventListener('change',e=>loadImg(e.target.files?.[0]));
+capIn.addEventListener('change',e=>loadImg(e.target.files?.[0]));
+overlayImg.addEventListener('load',()=>{
+  if(!overlayImg.naturalWidth) return;
+  const ratio=overlayImg.naturalHeight/overlayImg.naturalWidth;
+  let w=Math.min(innerWidth*.75,innerHeight*.62/ratio,520);
+  setS({baseW:w,baseH:w*ratio,scale:1,rot:0,flipH:false,flipV:false,cx:innerWidth/2,cy:innerHeight/2,hasImg:true});
+  szR.value=Math.round(w); szV.textContent=Math.round(w)+'px';
+  rotR.value='0'; rotV.textContent='0°';
+  fhBtn.classList.remove('on'); fvBtn.classList.remove('on');
+  status('جاهز ✓'); toast('الصورة جاهزة','✓'); haptic('med');
+});
+
+/* ── QUICK OPACITY ── */
+qOpR.addEventListener('input',()=>{
+  const v=parseFloat(qOpR.value); qOpV.textContent=Math.round(v*100)+'%';
+  opR.value=v; opV.textContent=Math.round(v*100)+'%'; setS({opacity:v});
+  document.querySelectorAll('.opBtn').forEach(b=>b.classList.remove('on')); updateMiniHud();
+});
+
+/* ── IMAGE CONTROLS ── */
+fitBtn.addEventListener('click',()=>{
+  if(!S.hasImg) return;
+  const ratio=overlayImg.naturalHeight/overlayImg.naturalWidth;
+  let w=Math.min(innerWidth*.82,innerHeight*.7/ratio,600);
+  setS({baseW:w,baseH:w*ratio,scale:1,rot:0,cx:innerWidth/2,cy:innerHeight/2});
+  szR.value=Math.round(w); szV.textContent=Math.round(w)+'px'; rotR.value='0'; rotV.textContent='0°';
+  haptic('light'); toast('ملاءمة','⟲');
+});
+ctrBtn.addEventListener('click',()=>{ setS({cx:innerWidth/2,cy:innerHeight/2}); haptic('light'); toast('توسيط','⊕'); });
+fhBtn.addEventListener('click',()=>{ setS({flipH:!S.flipH}); fhBtn.classList.toggle('on',S.flipH); haptic('light'); });
+fvBtn.addEventListener('click',()=>{ setS({flipV:!S.flipV}); fvBtn.classList.toggle('on',S.flipV); haptic('light'); });
+function syncRot(r){ const d=((r%360)+360)%360,di=d>180?d-360:d; rotR.value=Math.round(di*10)/10; rotV.textContent=Math.round(di)+'°'; }
+r90Btn.addEventListener('click',()=>{ setS({rot:S.rot+90}); syncRot(S.rot); haptic('light'); });
+r45Btn.addEventListener('click',()=>{ setS({rot:S.rot+45}); syncRot(S.rot); haptic('light'); });
+snapRotBtn.addEventListener('click',()=>{
+  const snaps=[0,45,90,135,180,-135,-90,-45];
+  const cur=((S.rot%360)+360)%360,cn=cur>180?cur-360:cur;
+  let best=0,bd=999; snaps.forEach(s=>{ const d=Math.abs(s-cn); if(d<bd){bd=d;best=s;} });
+  setS({rot:best}); syncRot(best); haptic('med'); snapMsg('📐 '+best+'°');
+});
+resetBtn.addEventListener('click',()=>{
+  setS({scale:1,rot:0,flipH:false,flipV:false,cx:innerWidth/2,cy:innerHeight/2,bright:1,contrast:1,sat:1,hue:0,blur:0});
+  [['rotR','0'],['brR','1'],['coR','1'],['saR','1'],['huR','0'],['blR','0']].forEach(([id,v])=>$(id).value=v);
+  rotV.textContent='0°'; brV.textContent='100%'; coV.textContent='100%'; saV.textContent='100%'; huV.textContent='0°'; blV.textContent='0';
+  fhBtn.classList.remove('on'); fvBtn.classList.remove('on');
+  haptic('heavy'); toast('إعادة كاملة','↺');
+});
+
+/* ── LOCK ── */
+lockFab.addEventListener('click',()=>{
+  S.locked=!S.locked; lockFab.textContent=S.locked?'🔒':'🔓';
+  lockFab.className='fab'+(S.locked?' lock-on':'');
+  toast(S.locked?'الصورة مثبّتة':'الصورة حرّة',S.locked?'🔒':'🔓',S.locked?'var(--accent2)':undefined);
+  haptic(S.locked?'heavy':'med'); status(S.locked?'مثبّت':'جاهز');
+  if(S.locked) setMode('🔒 مثبّت','var(--accent2)'); else if(!S.drawMode&&!S.traceMode) setMode(null);
+});
+
+/* ── TRACE MODE ── */
+traceFab.addEventListener('click',()=>{
+  S.traceMode=!S.traceMode; traceFab.className='fab'+(S.traceMode?' trace-on':'');
+  traceEl.classList.toggle('on',S.traceMode);
+  if(S.traceMode){
+    setS({opacity:.42,contrast:2,sat:0,bright:1.3});
+    opR.value=.42; opV.textContent='42%'; qOpR.value=.42; qOpV.textContent='42%';
+    coR.value=2; coV.textContent='200%'; saR.value=0; saV.textContent='0%'; brR.value=1.3; brV.textContent='130%';
+    setMode('🔦 تتبّع','var(--yellow)'); toast('وضع التتبّع','🔦','var(--yellow)');
+  } else {
+    setS({opacity:.55,contrast:1,sat:1,bright:1});
+    opR.value=.55; opV.textContent='55%'; qOpR.value=.55; qOpV.textContent='55%';
+    coR.value=1; coV.textContent='100%'; saR.value=1; saV.textContent='100%'; brR.value=1; brV.textContent='100%';
+    if(!S.locked&&!S.drawMode) setMode(null); toast('تم إيقاف التتبّع','🔦');
+  }
+  haptic('med'); updateMiniHud();
+});
+
+/* ── FAB TOGGLES ── */
+function togFab(btn,el,cls){ const on=!el.classList.contains('on'); el.classList.toggle('on',on); btn.classList.toggle(cls||'on',on); haptic('light'); return on; }
+gridFab.addEventListener('click',()=>{ const on=togFab(gridFab,guideCvs,'on'); if(on&&S.guideMode==='none') setGuide('thirds'); else if(!on){ S.guideMode='none'; updateGBtns(); guideCvs.classList.remove('on'); } });
+crossFab.addEventListener('click',()=>togFab(crossFab,crossEl,'on'));
+vigFab.addEventListener('click',()=>togFab(vigFab,vigEl,'on'));
+rulerFab.addEventListener('click',()=>{ const on=togFab(rulerFab,rulerEl,'on'); if(on) positionRuler(); });
+
+/* ── RULER ── */
+function positionRuler(){ rulerH.style.top=S.rulerHY+'px'; rulerH.style.left='0'; rulerH.style.right='0'; rulerV.style.left=S.rulerVX+'px'; rulerV.style.top='0'; rulerV.style.bottom='0'; rulerHL.textContent='Y: '+Math.round(S.rulerHY)+'px'; rulerVL.textContent='X: '+Math.round(S.rulerVX)+'px'; }
+positionRuler();
+let rDrag=null;
+rulerH.addEventListener('pointerdown',e=>{ if(!rulerEl.classList.contains('on')) return; e.stopPropagation(); rulerH.setPointerCapture(e.pointerId); rDrag={axis:'h',start:e.clientY,oy:S.rulerHY}; },{passive:false});
+rulerV.addEventListener('pointerdown',e=>{ if(!rulerEl.classList.contains('on')) return; e.stopPropagation(); rulerV.setPointerCapture(e.pointerId); rDrag={axis:'v',start:e.clientX,ox:S.rulerVX}; },{passive:false});
+document.addEventListener('pointermove',e=>{ if(!rDrag) return; if(rDrag.axis==='h'){ S.rulerHY=Math.max(2,Math.min(innerHeight-2,rDrag.oy+(e.clientY-rDrag.start))); rulerH.style.top=S.rulerHY+'px'; rulerHL.textContent='Y: '+Math.round(S.rulerHY)+'px'; } else { S.rulerVX=Math.max(2,Math.min(innerWidth-2,rDrag.ox+(e.clientX-rDrag.start))); rulerV.style.left=S.rulerVX+'px'; rulerVL.textContent='X: '+Math.round(S.rulerVX)+'px'; } },{passive:true});
+document.addEventListener('pointerup',()=>{ rDrag=null; });
+
+/* ── LEVEL ── */
+let levelHandler=null;
+levelFab.addEventListener('click',()=>{
+  const on=togFab(levelFab,levelWrap,'on');
+  if(on){ if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){ DeviceOrientationEvent.requestPermission().then(r=>{ if(r==='granted') startLevel(); else toast('لم يتم منح الإذن','⚠️','var(--red)'); }).catch(()=>{}); } else startLevel(); } else stopLevel();
+});
+function startLevel(){ stopLevel(); levelHandler=e=>{ const deg=typeof e.gamma==='number'?e.gamma:0,cl=Math.max(-90,Math.min(90,deg)),pct=(cl+90)/180*100,dist=Math.abs(pct-50); levelFill.style.left=Math.min(pct,50)+'%'; levelFill.style.width=(dist*2)+'%'; levelFill.style.background=dist<3?'var(--green)':'var(--accent3)'; levelText.textContent=Math.round(cl)+'°'; }; window.addEventListener('deviceorientation',levelHandler,{passive:true}); }
+function stopLevel(){ if(levelHandler){ window.removeEventListener('deviceorientation',levelHandler); levelHandler=null; } }
+
+/* ═══════════════════════════════════════
+   DRAW MODE — pen + straight line + eraser
+   Two-finger swipe = undo/redo
+═══════════════════════════════════════ */
+let drawHistory=[],drawHistIdx=-1;
+
+drawFab.addEventListener('click',()=>{
+  S.drawMode=!S.drawMode;
+  drawCvs.classList.toggle('on',S.drawMode);
+  linePrevCvs.style.display=S.drawMode?'block':'none';
+  drawBar.classList.toggle('on',S.drawMode);
+  drawFab.className='fab'+(S.drawMode?' draw-on':'');
+  overlayOuter.style.pointerEvents=S.drawMode?'none':'auto';
+  haptic(S.drawMode?'med':'light');
+  if(S.drawMode){
+    setMode('🖊️ رسم','var(--accent3)');
+    toast('اضغط 👁 لإخفاء الواجهة','🖊️','var(--accent3)',2200);
+    switchTool('pen');
+  } else {
+    if(!S.locked&&!S.traceMode) setMode(null);
+    if(S.uiHidden) showUI();
+    toast('تم إيقاف الرسم','✕');
+    drawBar.classList.remove('compact');
+    brushCursor.className='brushCursor';
+    linePrevCvs.style.display='none';
+  }
+  status(S.drawMode?'رسم…':'جاهز');
+  if(!S.drawMode) positionFabs();
+});
+
+penBtn.addEventListener('click',()=>{ switchTool('pen'); haptic('light'); });
+lineBtn.addEventListener('click',()=>{ switchTool('line'); haptic('light'); toast('ارسم واسحب لخط مستقيم','╱','var(--muted)',1500); });
+eraserBtn.addEventListener('click',()=>{ switchTool('eraser'); haptic('light'); });
+clearBtn.addEventListener('click',()=>{
+  drawCvs.getContext('2d').clearRect(0,0,drawCvs.width,drawCvs.height);
+  drawHistory=[]; drawHistIdx=-1; updateHistBadge(); haptic('med'); toast('تم مسح الرسم','🗑️');
+});
+colorSwatch.addEventListener('click',()=>colorPickerHidden.click());
+colorPickerHidden.addEventListener('input',e=>{ setDrawColor(e.target.value); switchTool('pen'); });
+brushSlider.addEventListener('input',()=>{
+  S.drawSize=parseFloat(brushSlider.value); brushSizeDisp.textContent=Math.round(S.drawSize)+'px';
+  updateBrushCursorSize(); updateBrushPreview();
+});
+brushAlphaSlider.addEventListener('input',()=>{ S.drawAlpha=parseInt(brushAlphaSlider.value)/100; brushAlphaDisp.textContent=parseInt(brushAlphaSlider.value)+'%'; });
+
+function updateBrushCursorSize(){ const sz=Math.max(6,S.drawSize*2); brushCursor.style.width=sz+'px'; brushCursor.style.height=sz+'px'; }
+updateBrushCursorSize(); updateBrushPreview();
+
+function updateHistBadge(){ let b=undoBtn.querySelector('.badge'); if(!b){ b=document.createElement('span'); b.className='badge'; undoBtn.appendChild(b); } b.textContent=drawHistIdx>=0?(drawHistIdx+1):''; }
+function saveHistory(){ const snap=drawCvs.getContext('2d').getImageData(0,0,drawCvs.width,drawCvs.height); drawHistory=drawHistory.slice(0,drawHistIdx+1); drawHistory.push(snap); if(drawHistory.length>40) drawHistory.shift(); drawHistIdx=drawHistory.length-1; updateHistBadge(); }
+function doUndo(){ if(drawHistIdx<=0){ toast('لا يوجد تراجع','⚠️','var(--muted)'); return false; } drawHistIdx--; drawCvs.getContext('2d').putImageData(drawHistory[drawHistIdx],0,0); haptic('light'); updateHistBadge(); return true; }
+function doRedo(){ if(drawHistIdx>=drawHistory.length-1){ toast('لا يوجد إعادة','⚠️','var(--muted)'); return false; } drawHistIdx++; drawCvs.getContext('2d').putImageData(drawHistory[drawHistIdx],0,0); haptic('light'); updateHistBadge(); return true; }
+undoBtn.addEventListener('click',doUndo);
+redoBtn.addEventListener('click',doRedo);
+
+/* Draw pointer events */
+let dPath=null, lineStart=null, linePts=new Map();
+let twoFingerStartX=null; // for undo/redo swipe
+
+drawCvs.addEventListener('pointerdown',e=>{
+  e.preventDefault(); drawCvs.setPointerCapture(e.pointerId);
+  linePts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  // Two-finger gesture tracking
+  if(linePts.size===2){
+    const pts=Array.from(linePts.values());
+    twoFingerStartX=(pts[0].x+pts[1].x)/2;
+    dPath=null; lineStart=null;
+    return;
+  }
+  twoFingerStartX=null;
+
+  if(S.drawTool==='line'){
+    lineStart={x:e.clientX,y:e.clientY};
+  } else {
+    dPath={x:e.clientX,y:e.clientY};
+    const ctx=drawCvs.getContext('2d'); ctx.beginPath(); ctx.moveTo(e.clientX,e.clientY);
+  }
+},{passive:false});
+
+drawCvs.addEventListener('pointermove',e=>{
+  linePts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+  // brush cursor always follows
+  brushCursor.style.left=e.clientX+'px'; brushCursor.style.top=e.clientY+'px';
+  if(S.drawMode&&linePts.size===1) brushCursor.className='brushCursor on '+S.drawTool;
+
+  // two-finger move = undo/redo
+  if(linePts.size===2&&twoFingerStartX!==null){
+    const pts=Array.from(linePts.values());
+    const curX=(pts[0].x+pts[1].x)/2;
+    const dx=curX-twoFingerStartX;
+    if(Math.abs(dx)>60){
+      if(dx>0) doRedo(); else doUndo();
+      twoFingerStartX=curX; // reset to avoid repeat
+    }
+    return;
+  }
+
+  if(!dPath&&!lineStart) return;
+  e.preventDefault();
+  const ctx=drawCvs.getContext('2d');
+  const isErase=S.drawTool==='eraser';
+
+  if(S.drawTool==='line'&&lineStart){
+    // Draw live preview on separate canvas
+    const pctx=linePrevCvs.getContext('2d');
+    pctx.clearRect(0,0,linePrevCvs.width,linePrevCvs.height);
+    pctx.beginPath(); pctx.moveTo(lineStart.x,lineStart.y); pctx.lineTo(e.clientX,e.clientY);
+    pctx.lineWidth=S.drawSize; pctx.lineCap='round'; pctx.strokeStyle=S.drawColor; pctx.globalAlpha=S.drawAlpha;
+    pctx.stroke();
+    return;
+  }
+
+  const speed=Math.hypot(e.clientX-dPath.x,e.clientY-dPath.y);
+  const pressAlpha=isErase?1:Math.min(1,S.drawAlpha*(1-Math.min(speed,30)/80*.15));
+  ctx.lineWidth=isErase?S.drawSize*5:S.drawSize; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.globalCompositeOperation=isErase?'destination-out':'source-over';
+  ctx.globalAlpha=pressAlpha; ctx.strokeStyle=isErase?'rgba(0,0,0,1)':S.drawColor;
+  const mx=(dPath.x+e.clientX)/2,my=(dPath.y+e.clientY)/2;
+  ctx.quadraticCurveTo(dPath.x,dPath.y,mx,my); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx,my);
+  dPath.x=e.clientX; dPath.y=e.clientY;
+},{passive:false});
+
+drawCvs.addEventListener('pointerup',e=>{
+  const wasTwo=linePts.size>=2; linePts.delete(e.pointerId);
+  if(wasTwo){ twoFingerStartX=null; return; }
+
+  if(S.drawTool==='line'&&lineStart){
+    // Commit line to main canvas
+    linePrevCvs.getContext('2d').clearRect(0,0,linePrevCvs.width,linePrevCvs.height);
+    const ctx=drawCvs.getContext('2d');
+    ctx.beginPath(); ctx.moveTo(lineStart.x,lineStart.y); ctx.lineTo(e.clientX,e.clientY);
+    ctx.lineWidth=S.drawSize; ctx.lineCap='round'; ctx.strokeStyle=S.drawColor; ctx.globalAlpha=S.drawAlpha;
+    ctx.globalCompositeOperation='source-over'; ctx.stroke();
+    ctx.globalAlpha=1; lineStart=null;
+    saveHistory(); haptic('light'); return;
+  }
+
+  if(!dPath) return; dPath=null;
+  const ctx=drawCvs.getContext('2d'); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+  saveHistory(); haptic('light');
+});
+drawCvs.addEventListener('pointercancel',e=>{ linePts.delete(e.pointerId); dPath=null; lineStart=null; linePrevCvs.getContext('2d').clearRect(0,0,linePrevCvs.width,linePrevCvs.height); });
+drawCvs.addEventListener('pointerleave',e=>{ if(!linePts.has(e.pointerId)) brushCursor.style.display='none'; });
+
+/* ── CANVAS RESIZE ── */
+function resizeCvs(){
+  const w=innerWidth,h=innerHeight,ctx=drawCvs.getContext('2d');
+  let saved=null; try{ saved=ctx.getImageData(0,0,drawCvs.width||1,drawCvs.height||1); }catch(_){}
+  drawCvs.width=w; drawCvs.height=h;
+  linePrevCvs.width=w; linePrevCvs.height=h;
+  if(saved) try{ ctx.putImageData(saved,0,0); }catch(_){}
+  drawGuides();
+}
+resizeCvs();
+
+/* ── GUIDES ── */
+const GMAP={none:'gnBtn',thirds:'g3Btn',quarters:'g4Btn',golden:'ggBtn',diagonal:'gdBtn',circle:'gcBtn',triangle:'gtBtn'};
+function updateGBtns(){ Object.values(GMAP).forEach(id=>{ const el=$(id); if(el) el.classList.remove('on'); }); if(GMAP[S.guideMode]) $(GMAP[S.guideMode]).classList.add('on'); }
+Object.entries(GMAP).forEach(([mode,id])=>{ const el=$(id); if(el) el.addEventListener('click',()=>setGuide(mode)); });
+$('slBtn').addEventListener('click',()=>{ const on=!scanEl.classList.contains('on'); scanEl.classList.toggle('on',on); $('slBtn').classList.toggle('on',on); haptic('light'); });
+gaR.addEventListener('input',()=>{ S.guideAlpha=parseInt(gaR.value)/100; gaV.textContent=parseInt(gaR.value)+'%'; drawGuides(); });
+function setGuide(mode){ S.guideMode=mode; updateGBtns(); const show=mode!=='none'; guideCvs.classList.toggle('on',show); gridFab.classList.toggle('on',show); drawGuides(); haptic('light'); }
+function drawGuides(){
+  const w=innerWidth,h=innerHeight; guideCvs.width=w; guideCvs.height=h;
+  if(!guideCvs.classList.contains('on')||S.guideMode==='none') return;
+  const ctx=guideCvs.getContext('2d'),alpha=S.guideAlpha,mode=S.guideMode,cw=w/2,ch=h/2;
+  ctx.strokeStyle=`rgba(63,255,197,${alpha})`; ctx.lineWidth=1; ctx.fillStyle=`rgba(63,255,197,${Math.min(alpha*2.5,.7)})`;
+  if(mode==='thirds'||mode==='quarters'){
+    const n=mode==='thirds'?3:4; ctx.beginPath();
+    for(let i=1;i<n;i++){ ctx.moveTo(w*i/n,0);ctx.lineTo(w*i/n,h);ctx.moveTo(0,h*i/n);ctx.lineTo(w,h*i/n); }
+    ctx.stroke();
+    for(let x=1;x<n;x++) for(let y=1;y<n;y++){ ctx.beginPath();ctx.arc(w*x/n,h*y/n,4,0,Math.PI*2);ctx.fill(); }
+  } else if(mode==='golden'){
+    const phi=0.618; ctx.beginPath(); [phi,1-phi].forEach(r=>{ ctx.moveTo(w*r,0);ctx.lineTo(w*r,h);ctx.moveTo(0,h*r);ctx.lineTo(w,h*r); }); ctx.stroke();
+    [[phi,phi],[phi,1-phi],[1-phi,phi],[1-phi,1-phi]].forEach(([rx,ry])=>{ ctx.beginPath();ctx.arc(w*rx,h*ry,5,0,Math.PI*2);ctx.fill(); });
+    ctx.save(); ctx.strokeStyle=`rgba(251,191,36,${alpha*.6})`; ctx.setLineDash([3,5]); ctx.beginPath(); ctx.arc(w*phi,h*(1-phi),w*(1-phi),Math.PI,Math.PI*1.5); ctx.stroke(); ctx.restore();
+  } else if(mode==='diagonal'){
+    ctx.beginPath(); ctx.moveTo(0,0);ctx.lineTo(w,h); ctx.moveTo(w,0);ctx.lineTo(0,h);
+    ctx.moveTo(0,h/3);ctx.lineTo(w*2/3,0); ctx.moveTo(0,h*2/3);ctx.lineTo(w,h/3);
+    ctx.moveTo(w/3,h);ctx.lineTo(w,h/3); ctx.moveTo(w*2/3,h);ctx.lineTo(w,h*2/3); ctx.stroke();
+  } else if(mode==='circle'){
+    const rmax=Math.min(w,h)*.46; [1,.618,.382,.236].forEach(f=>{ ctx.beginPath();ctx.arc(cw,ch,rmax*f,0,Math.PI*2);ctx.stroke(); });
+    ctx.beginPath();ctx.moveTo(cw-rmax,ch);ctx.lineTo(cw+rmax,ch);ctx.moveTo(cw,ch-rmax);ctx.lineTo(cw,ch+rmax);ctx.stroke();
+  } else if(mode==='triangle'){
+    const r=Math.min(w,h)*.44;
+    [-Math.PI/2,Math.PI/2].forEach(base=>{
+      ctx.beginPath();
+      for(let i=0;i<3;i++){ const a=base+i*2*Math.PI/3; if(i===0) ctx.moveTo(cw+r*Math.cos(a),ch+r*Math.sin(a)); else ctx.lineTo(cw+r*Math.cos(a),ch+r*Math.sin(a)); }
+      ctx.closePath(); ctx.stroke();
+    });
+    ctx.beginPath();ctx.arc(cw,ch,4,0,Math.PI*2);ctx.fill();
+  }
+}
+
+/* ── SCREENSHOT ── */
+snapFab.addEventListener('click',async()=>{
+  haptic('heavy');
+  flashEl.style.transition='none'; flashEl.classList.add('pop');
+  requestAnimationFrame(()=>{ flashEl.style.transition='opacity .55s ease'; flashEl.classList.remove('pop'); });
+  try{
+    const cvs=document.createElement('canvas'),vw=innerWidth,vh=innerHeight; cvs.width=vw; cvs.height=vh;
+    const ctx=cvs.getContext('2d');
+    if(camera.readyState>=2) ctx.drawImage(camera,0,0,vw,vh);
+    if(S.hasImg&&overlayImg.complete&&overlayImg.naturalWidth){
+      const{cx,cy,scale,rot,baseW,baseH,opacity,flipH,flipV}=S;
+      ctx.save(); ctx.globalAlpha=opacity; ctx.translate(cx,cy); ctx.rotate(rot*Math.PI/180);
+      ctx.scale(scale*(flipH?-1:1),scale*(flipV?-1:1));
+      ctx.drawImage(overlayImg,-baseW/2,-baseH/2,baseW,baseH); ctx.restore();
+    }
+    ctx.drawImage(drawCvs,0,0,vw,vh);
+    const link=document.createElement('a'); link.download='ar-trace-'+Date.now()+'.png';
+    link.href=cvs.toDataURL('image/png',1); link.click(); toast('تم الحفظ!','📸');
+  }catch(e){ toast('خطأ في الحفظ','⚠️','var(--red)'); console.warn(e); }
+});
+
+/* ── SLIDERS ── */
+function sl(el,valEl,applyFn,fmtFn){ el.addEventListener('input',()=>{ const v=parseFloat(el.value); valEl.textContent=fmtFn(v); applyFn(v); }); }
+sl(opR,opV,v=>{ qOpR.value=v; qOpV.textContent=Math.round(v*100)+'%'; setS({opacity:v}); document.querySelectorAll('.opBtn').forEach(b=>b.classList.remove('on')); updateMiniHud(); },v=>Math.round(v*100)+'%');
+sl(szR,szV,w=>{ const r=S.hasImg&&overlayImg.naturalWidth?overlayImg.naturalHeight/overlayImg.naturalWidth:1; setS({baseW:w,baseH:w*r}); },v=>Math.round(v)+'px');
+sl(rotR,rotV,d=>setS({rot:d}),v=>Math.round(v)+'°');
+sl(brR,brV,v=>setS({bright:v}),v=>Math.round(v*100)+'%');
+sl(coR,coV,v=>setS({contrast:v}),v=>Math.round(v*100)+'%');
+sl(saR,saV,v=>setS({sat:v}),v=>Math.round(v*100)+'%');
+sl(huR,huV,v=>setS({hue:v}),v=>Math.round(v)+'°');
+sl(blR,blV,v=>setS({blur:v}),v=>v.toFixed(1));
+sl(faR,faV,v=>setS({fAmt:v/100}),v=>Math.round(v)+'%');
+
+/* ── FILTER PILLS ── */
+document.querySelectorAll('.fPill').forEach(p=>{ p.addEventListener('click',()=>{ document.querySelectorAll('.fPill').forEach(x=>x.classList.remove('on')); p.classList.add('on'); setS({filter:p.dataset.f}); haptic('light'); }); });
+
+/* ═══════════════════════════════════════
+   GESTURE ENGINE
+═══════════════════════════════════════ */
+const ptrs=new Map();
+let drag=null,pinch=null,velX=0,velY=0,momRaf=null;
+function stopMom(){ cancelAnimationFrame(momRaf); momRaf=null; velX=0; velY=0; }
+let lastTap=0,lastTapX=0,lastTapY=0;
+
+overlayOuter.addEventListener('pointerdown',e=>{
+  e.preventDefault(); overlayOuter.setPointerCapture(e.pointerId); stopMom();
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===1){
+    const now=Date.now();
+    if(now-lastTap<280&&Math.hypot(e.clientX-lastTapX,e.clientY-lastTapY)<44){
+      setS({cx:innerWidth/2,cy:innerHeight/2}); toast('توسيط','⊕'); haptic('med'); lastTap=0; return;
+    }
+    lastTap=now; lastTapX=e.clientX; lastTapY=e.clientY;
+  }
+  if(ptrs.size===1&&!S.locked){ drag={sx:e.clientX,sy:e.clientY,ocx:S.cx,ocy:S.cy,lx:e.clientX,ly:e.clientY}; status('سحب…'); }
+  if(ptrs.size===2&&!S.locked){
+    const[p1,p2]=Array.from(ptrs.values());
+    pinch={d0:Math.hypot(p2.x-p1.x,p2.y-p1.y),a0:Math.atan2(p2.y-p1.y,p2.x-p1.x),s0:S.scale,r0:S.rot,cx0:S.cx,cy0:S.cy,mx0:(p1.x+p2.x)/2,my0:(p1.y+p2.y)/2};
+    drag=null; status('تكبير…');
+  }
+},{passive:false});
+
+overlayOuter.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)) return; e.preventDefault();
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(S.locked) return;
+  if(ptrs.size===1&&drag){
+    const dx=e.clientX-drag.lx,dy=e.clientY-drag.ly;
+    velX=velX*.55+dx*.45; velY=velY*.55+dy*.45;
+    drag.lx=e.clientX; drag.ly=e.clientY;
+    setS({cx:drag.ocx+(e.clientX-drag.sx),cy:drag.ocy+(e.clientY-drag.sy)});
+  }
+  if(ptrs.size===2&&pinch){
+    const[p1,p2]=Array.from(ptrs.values());
+    const d=Math.hypot(p2.x-p1.x,p2.y-p1.y),a=Math.atan2(p2.y-p1.y,p2.x-p1.x);
+    const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,f=d/pinch.d0;
+    let ns=Math.max(.04,Math.min(18,pinch.s0*f)),snapped=false;
+    [[.25,'0.25×'],[.5,'0.5×'],[1,'1×'],[1.5,'1.5×'],[2,'2×'],[3,'3×']].forEach(([sv,lbl])=>{ if(!snapped&&Math.abs(ns-sv)<.06){ ns=sv; snapMsg('🔒 '+lbl); snapped=true; } });
+    const rawRot=pinch.r0+(a-pinch.a0)*(180/Math.PI);
+    const nearSnap=Math.round(rawRot/45)*45,useRot=Math.abs(rawRot-nearSnap)<2.5?nearSnap:rawRot;
+    if(Math.abs(rawRot-nearSnap)<2.5&&useRot!==rawRot) snapMsg('📐 '+nearSnap+'°');
+    const ncx=pinch.mx0+(pinch.cx0-pinch.mx0)*f+(mx-pinch.mx0);
+    const ncy=pinch.my0+(pinch.cy0-pinch.my0)*f+(my-pinch.my0);
+    setS({scale:ns,rot:useRot,cx:ncx,cy:ncy}); showZoom(); updateMiniHud();
+    let dr=((useRot%360)+360)%360; if(dr>180) dr-=360;
+    rotR.value=Math.round(dr*10)/10; rotV.textContent=Math.round(dr)+'°';
+  }
+},{passive:false});
+
+function applyMomentum(){ if(Math.abs(velX)<.3&&Math.abs(velY)<.3){ stopMom(); status('جاهز'); return; } velX*=.87; velY*=.87; setS({cx:S.cx+velX,cy:S.cy+velY}); momRaf=requestAnimationFrame(applyMomentum); }
+function onPointerEnd(e){
+  ptrs.delete(e.pointerId);
+  if(ptrs.size===0){ if(drag&&!S.locked&&(Math.abs(velX)>1.2||Math.abs(velY)>1.2)) applyMomentum(); else if(!S.locked) status('جاهز'); drag=null; pinch=null; }
+  else if(ptrs.size===1){ const[,pos]=Array.from(ptrs.entries())[0]; drag={sx:pos.x,sy:pos.y,ocx:S.cx,ocy:S.cy,lx:pos.x,ly:pos.y}; pinch=null; velX=0; velY=0; if(!S.locked) status('سحب…'); }
+}
+overlayOuter.addEventListener('pointerup',onPointerEnd);
+overlayOuter.addEventListener('pointercancel',onPointerEnd);
+
+/* ── INIT ── */
+sched();
+})();
+</script>
+
+</body>
+</html>
